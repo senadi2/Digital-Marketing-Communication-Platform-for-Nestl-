@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Nestle Marketing Platform</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+<link rel="stylesheet" href="AA_DASH.css">
+</head>
+
+<body>
+<div class="container">
+  <aside class="sidebar">
+    <div class="logo">
+      <img src="Images/logo_nobackground.png" alt="Nestle platform logo">
+    </div>
+
+    <div class="sidebar-copy">
+      <p class="eyebrow">Agency Workspace</p>
+      <h1>Campaign Hub</h1>
+      <p class="sidebar-text">Track every assigned campaign, upcoming milestone, and creative priority in one place.</p>
+    </div>
+
+    <ul class="nav">
+      <li class="active"><i class="fa-solid fa-house"></i><span>Home</span></li>
+      <li><i class="fa-solid fa-bullhorn"></i><span>Campaigns</span></li>
+      <li><i class="fa-solid fa-comments"></i><span>Chat</span></li>
+    </ul>
+  </aside>
+
+  <main class="main">
+    <div class="topbar">
+      <div class="topbar-meta">
+        <img src="Images/logo.svg" alt="Nestle logo">
+      </div>
+
+      <div class="topbar-actions">
+        <div class="notifications" aria-label="Notifications">
+          <i class="fa-solid fa-bell"></i>
+          <span class="badge" id="notificationCount">2</span>
+        </div>
+        <button class="logout">Sign Out</button>
+      </div>
+    </div>
+
+    <section class="hero-banner">
+      <div class="hero-copy">
+        <p class="hero-label">Welcome back</p>
+        <h3>Everything your agency has been assigned is visible here.</h3>
+        <p>Review active briefs, monitor timelines, and keep your team aligned before the next submission window.</p>
+      </div>
+
+      <div class="hero-stats">
+        <div class="stat-card">
+          <span class="stat-value" id="campaignCount">0</span>
+          <span class="stat-label">Assigned Campaigns</span>
+        </div>
+        <div class="stat-card">
+          <span class="stat-value">3</span>
+          <span class="stat-label">Priority Reviews</span>
+        </div>
+        <div class="stat-card">
+          <span class="stat-value">2</span>
+          <span class="stat-label">Due This Week</span>
+        </div>
+      </div>
+    </section>
+
+    <section class="campaign-section">
+      <div class="section-heading">
+        <div>
+          <p class="section-label">Assigned Work</p>
+          <h2>Assigned Campaigns</h2>
+        </div>
+      </div>
+
+      <div class="campaign-grid" id="campaignList"></div>
+
+      <div class="section-actions">
+        <button class="viewMore" id="viewMoreBtn" type="button">View More</button>
+      </div>
+    </section>
+
+    <footer>
+      Nestlé Digital Marketing Platform | System Version 1.0 | &copy; 2026 Nestlé Sri Lanka
+    </footer>
+  </main>
+</div>
+
+<script src="AA_DASH.js"></script>
+</body>
+</html>

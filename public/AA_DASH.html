@@ -17,15 +17,12 @@
     </div>
 
     <div class="sidebar-copy">
-      <p class="eyebrow">Agency Workspace</p>
-      <h1>Campaign Hub</h1>
-      <p class="sidebar-text">Track every assigned campaign, upcoming milestone, and creative priority in one place.</p>
+      <h2>Smarter Campaigns. Seamless Collaboration.</h2>
+      <p class="sidebar-text">Built for speed, clarity, and better advertising outcomes.</p>
     </div>
 
     <ul class="nav">
       <li class="active"><i class="fa-solid fa-house"></i><span>Home</span></li>
-      <li><i class="fa-solid fa-bullhorn"></i><span>Campaigns</span></li>
-      <li><i class="fa-solid fa-comments"></i><span>Chat</span></li>
     </ul>
   </aside>
 
@@ -36,9 +33,13 @@
       </div>
 
       <div class="topbar-actions">
-        <div class="notifications" aria-label="Notifications">
+        <div class="notifications" aria-label="Notifications" id="notificationBell">
           <i class="fa-solid fa-bell"></i>
-          <span class="badge" id="notificationCount">2</span>
+          <span class="badge" id="notificationCount">0</span>
+        </div>
+        <div class="notification-panel" id="notificationPanel">
+          <h3>Notifications</h3>
+          <div id="notificationList" class="notification-list"></div>
         </div>
         <button class="logout">Sign Out</button>
       </div>
@@ -47,24 +48,10 @@
     <section class="hero-banner">
       <div class="hero-copy">
         <p class="hero-label">Welcome back</p>
-        <h3>Everything your agency has been assigned is visible here.</h3>
-        <p>Review active briefs, monitor timelines, and keep your team aligned before the next submission window.</p>
+        <h3>Stay Aligned. Stay Ahead.</h3>
+        <p>Collaborate with Nestlé teams, deliver exceptional work, and keep every project moving forward.</p>
       </div>
 
-      <div class="hero-stats">
-        <div class="stat-card">
-          <span class="stat-value" id="campaignCount">0</span>
-          <span class="stat-label">Assigned Campaigns</span>
-        </div>
-        <div class="stat-card">
-          <span class="stat-value">3</span>
-          <span class="stat-label">Priority Reviews</span>
-        </div>
-        <div class="stat-card">
-          <span class="stat-value">2</span>
-          <span class="stat-label">Due This Week</span>
-        </div>
-      </div>
     </section>
 
     <section class="campaign-section">
@@ -77,9 +64,6 @@
 
       <div class="campaign-grid" id="campaignList"></div>
 
-      <div class="section-actions">
-        <button class="viewMore" id="viewMoreBtn" type="button">View More</button>
-      </div>
     </section>
 
     <footer>

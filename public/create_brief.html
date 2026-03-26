@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>KOALA by nestle | Campaign Briefs Creations</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+<link rel="icon" href="Images/faviconimg.png" type="image/png">
+<link rel="stylesheet" href="create_brief.css">
+</head>
+<body>
+  <main class="agency-page">
+    <header class="page-header">
+      <div>
+        <a href="MM_dash.html" class="back-link"><i class="fa-solid fa-arrow-left"></i> Back to Dashboard</a>
+        <p class="eyebrow">Registered Agency</p>
+        <h1 id="agencyName">Unnamed Agency</h1>
+      </div>
+      <button class="primary-btn" type="button" id="openBriefModalBtn">Create New Campaign Brief</button>
+    </header>
+
+    <section class="agency-info-card">
+      <img id="agencyImage" src="Images/1.png" alt="Agency image" class="agency-image">
+      <h2>Description</h2>
+      <p id="agencyDescription">Agency description appears here.</p>
+    </section>
+
+    <section class="campaigns-section">
+      <h2>Ongoing Campaigns</h2>
+      <div class="campaign-grid" id="campaignList"></div>
+    </section>
+  </main>
+
+  <div class="modal" id="campaignBriefModal">
+    <div class="modal-content">
+      <h2>Create New Campaign Brief</h2>
+      <form id="campaignBriefForm" class="campaign-form">
+        <input id="campaignTitle" type="text" placeholder="Campaign Title" required>
+        <input id="targetAudience" type="text" placeholder="Target Audience" required>
+        <input id="budgetRange" type="text" placeholder="Budget Range" required>
+
+        <div class="timeline-row">
+          <div>
+            <label for="startDate">Start Date</label>
+            <input id="startDate" type="date" required>
+          </div>
+          <div>
+            <label for="endDate">End Date</label>
+            <input id="endDate" type="date" required>
+          </div>
+        </div>
+
+        <textarea id="campaignDescription" rows="3" placeholder="Description" required></textarea>
+        <textarea id="campaignObjectives" rows="3" placeholder="Campaign Objectives" required></textarea>
+
+        <div class="file-upload-wrap">
+          <label for="campaignAttachment">Attach Files</label>
+          <input id="campaignAttachment" type="file" multiple>
+        </div>
+
+        <div class="modal-actions">
+          <button type="button" class="secondary-btn" id="closeBriefModalBtn">Cancel</button>
+          <button type="submit" class="primary-btn">Submit Brief</button>
+        </div>
+
+        <p id="briefFormMessage" class="form-message" aria-live="polite"></p>
+      </form>
+    </div>
+  </div>
+
+  <script src="create_brief.js"></script>
+</body>
+</html>

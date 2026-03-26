@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>KOALA by Nestle | Campaign Detail</title>
+<link rel="icon" href="Images/faviconimg.png" type="image/png">
+<link rel="stylesheet" href="campaign_detail.css">
+</head>
+<body>
+  <main class="detail-page">
+    <header class="detail-header">
+      <a href="AA_DASH.html" class="back-link">&larr; Back to Dashboard</a>
+      <h1 id="campaignTitle">Campaign Detail</h1>
+      <p id="campaignStatus" class="status-pill">Pending</p>
+    </header>
+
+    <section class="detail-card">
+      <div class="grid">
+        <div class="item">
+          <label>Target Audience</label>
+          <p id="targetAudience">-</p>
+        </div>
+        <div class="item">
+          <label>Budget</label>
+          <p id="budgetRange">-</p>
+        </div>
+        <div class="item">
+          <label>Start Date</label>
+          <p id="startDate">-</p>
+        </div>
+        <div class="item">
+          <label>End Date</label>
+          <p id="endDate">-</p>
+        </div>
+      </div>
+    </section>
+
+    <section class="detail-card">
+      <h2>Description</h2>
+      <p id="description">-</p>
+    </section>
+
+    <section class="detail-card">
+      <h2>Objectives</h2>
+      <p id="objectives">-</p>
+    </section>
+
+    <section class="detail-card">
+      <h2>Attachments</h2>
+      <div id="attachmentList" class="attachment-list"></div>
+    </section>
+  </main>
+
+  <script src="campaign_detail.js"></script>
+</body>
+</html>

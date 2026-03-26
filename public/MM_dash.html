@@ -18,15 +18,13 @@
     </div>
 
     <div class="sidebar-copy">
-      <p class="eyebrow">Marketing Workspace</p>
-      <h1>Agency Console</h1>
-      <p class="sidebar-text">Manage partner agencies, send onboarding invites, and keep campaign collaboration aligned from one dashboard.</p>
+      <h2>Total Visibility. Better Decisions. Faster Results.</h2>
+      <p class="sidebar-text">Built for speed, clarity, and better advertising outcomes.</p>
     </div>
 
     <ul class="nav">
       <li class="active"><i class="fa-solid fa-house"></i><span>Home</span></li>
       <li><i class="fa-solid fa-building-user"></i><a href="#agency-section"><span>Agencies</span></a></li>
-      <li><i class="fa-solid fa-file-circle-check"></i><span>Saved Drafts</span></li>
     </ul>
   </aside>
 
@@ -37,9 +35,13 @@
       </div>
 
       <div class="topbar-actions">
-        <div class="notifications" aria-label="Notifications">
+        <div class="notifications" aria-label="Notifications" id="notificationBell">
           <i class="fa-solid fa-bell"></i>
-          <span class="badge" id="notificationCount">2</span>
+          <span class="badge" id="notificationCount">0</span>
+        </div>
+        <div class="notification-panel" id="notificationPanel">
+          <h3>Notifications</h3>
+          <div id="notificationList" class="notification-list"></div>
         </div>
         <button class="addAgencyBtn" type="button" onclick="openModal()">+ Add New Agency</button>
         <button class="logout" type="button" onclick="logout()">Sign Out</button>
@@ -49,24 +51,10 @@
     <section class="hero-banner">
       <div class="hero-copy">
         <p class="hero-label">Partner Snapshot</p>
-        <h3>Grow and manage your advertising agency network with confidence.</h3>
+        <h3>Manage Every Campaign with Confidence</h3>
         <p>Review agency activity, onboard new partners quickly, and maintain a consistent collaboration workflow across campaigns.</p>
       </div>
 
-      <div class="hero-stats">
-        <div class="stat-card">
-          <span class="stat-value">6</span>
-          <span class="stat-label">Active Agencies</span>
-        </div>
-        <div class="stat-card">
-          <span class="stat-value">2</span>
-          <span class="stat-label">Pending Invites</span>
-        </div>
-        <div class="stat-card">
-          <span class="stat-value">4</span>
-          <span class="stat-label">Draft Profiles</span>
-        </div>
-      </div>
     </section>
 
     <section class="slideshow-section">
@@ -80,7 +68,7 @@
       <div class="slideshow">
         <div class="slide active">
           <img src="Images/s1.jpg" alt="Nestlé headquarters">
-          <div class="caption">Nestlé Headquarters</div>
+          <div class="caption">Nestlé Team</div>
         </div>
 
         <div class="slide">

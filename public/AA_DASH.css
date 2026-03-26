@@ -117,6 +117,7 @@ body {
     display: flex;
     align-items: center;
     gap: 16px;
+    position: relative;
 }
 
 .notifications {
@@ -147,6 +148,76 @@ body {
     font-weight: 700;
     display: grid;
     place-items: center;
+}
+
+.notification-panel {
+    position: absolute;
+    top: 56px;
+    right: 90px;
+    width: min(400px, 92vw);
+    background: #fff;
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    box-shadow: var(--shadow);
+    padding: 14px;
+    z-index: 40;
+    display: none;
+}
+
+.notification-panel.open {
+    display: block;
+}
+
+.notification-panel h3 {
+    margin: 0 0 10px;
+    font-size: 16px;
+}
+
+.notification-list {
+    display: grid;
+    gap: 8px;
+    max-height: 320px;
+    overflow-y: auto;
+}
+
+.notification-item {
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 10px;
+    background: #fff;
+    font-size: 13px;
+    line-height: 1.4;
+}
+
+.notification-time {
+    margin-top: 6px;
+    color: var(--text-soft);
+    font-size: 12px;
+}
+
+.notification-actions {
+    display: flex;
+    gap: 8px;
+    margin-top: 10px;
+}
+
+.notification-actions button {
+    border: none;
+    border-radius: 10px;
+    padding: 8px 10px;
+    cursor: pointer;
+    font-weight: 700;
+    font-size: 12px;
+}
+
+.notification-actions .accept-btn {
+    background: var(--primary);
+    color: #fff;
+}
+
+.notification-actions .decline-btn {
+    background: #d92d20;
+    color: #fff;
 }
 
 .logout,
@@ -269,6 +340,7 @@ body {
     overflow: hidden;
     box-shadow: 0 10px 24px rgba(10, 37, 64, 0.08);
     transition: transform 0.25s ease, box-shadow 0.25s ease;
+    cursor: pointer;
 }
 
 .campaign-card:hover {
@@ -282,8 +354,12 @@ body {
 
 .campaign-card img {
     width: 100%;
-    height: 190px;
+    height: auto;
+    aspect-ratio: 12 / 7;
+    margin: 8px 0 12px;
     object-fit: cover;
+    border-radius: 14px;
+    background: #dce4f5;
 }
 
 .campaign-card-content {
@@ -319,16 +395,16 @@ body {
 }
 
 .campaign-card h3 {
-    margin: 0 0 10px;
+    margin: 0;
     font-size: 21px;
     color: var(--text);
 }
 
 .campaign-card p {
-    margin: 0 0 18px;
+    margin: 0 0 8px;
     color: var(--text-soft);
     line-height: 1.6;
-    min-height: 76px;
+    min-height: 0;
 }
 
 .campaign-footer {
@@ -413,6 +489,11 @@ footer {
         justify-content: space-between;
     }
 
+    .notification-panel {
+        right: 0;
+        top: 58px;
+    }
+
     .hero-banner,
     .campaign-section {
         padding: 20px;
@@ -428,4 +509,43 @@ footer {
     .campaign-grid {
         grid-template-columns: 1fr;
     }
+}
+
+/* ================= CAMPAIGN CARD ACTION BUTTONS ================= */
+.campaign-card .action-btns {
+    display: flex;
+    gap: 10px;
+    margin-top: 12px;
+}
+
+.campaign-card .accept-btn,
+.campaign-card .decline-btn {
+    flex: 1;
+    padding: 10px 0;
+    font-weight: 700;
+    font-size: 14px;
+    border-radius: 12px;
+    border: none;
+    cursor: pointer;
+    transition: background 0.25s ease, transform 0.25s ease;
+}
+
+.campaign-card .accept-btn {
+    background-color: var(--primary);
+    color: white;
+}
+
+.campaign-card .accept-btn:hover {
+    background-color: var(--primary-dark);
+    transform: translateY(-2px);
+}
+
+.campaign-card .decline-btn {
+    background-color: #d92d20; /* red to indicate decline */
+    color: white;
+}
+
+.campaign-card .decline-btn:hover {
+    background-color: #b7281a;
+    transform: translateY(-2px);
 }

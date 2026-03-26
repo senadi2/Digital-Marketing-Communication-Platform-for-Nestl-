@@ -2,23 +2,38 @@ async function login() {
     const username = document.getElementById("username").value;
     const password = document.getElementById("password").value;
 
-    const res = await fetch("http://localhost:3000/api/login", {
-        method: "POST",
-        headers: {
-            "Content-Type": "application/json"
-        },
-        body: JSON.stringify({ username, password })
-    });
+    try {
+        const res = await fetch("/api/login", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json"
+            },
+            body: JSON.stringify({ username, password })
+        });
 
-    const data = await res.json();
+        const data = await res.json();
+        if (!res.ok) {
+            document.getElementById("error").textContent = data.message || "Login failed";
+            return;
+        }
 
-    if (data.role === "MarketingManager") {
-        window.location.href = "/MM_dash.html";
-    } else if (data.role === "Agency") {
-        window.location.href = "/AA_DASH.html";
-    } else {
+        localStorage.setItem("userId", data.userId);
+        localStorage.setItem("role", data.role);
+
+        if (data.role === "MarketingManager") {
+            window.location.href = "/MM_dash.html";
+            return;
+        }
+
+        if (data.role === "Agency") {
+            localStorage.setItem("agencyId", data.agencyId || "");
+            window.location.href = "/AA_DASH.html";
+            return;
+        }
+
         document.getElementById("error").textContent = "Login failed";
+    } catch (error) {
+        document.getElementById("error").textContent = "Server error. Please try again.";
     }
-
 }
 

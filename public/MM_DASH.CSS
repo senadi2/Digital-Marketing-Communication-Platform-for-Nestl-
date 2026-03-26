@@ -123,6 +123,7 @@ body {
     display: flex;
     align-items: center;
     gap: 16px;
+    position: relative;
 }
 
 .notifications {
@@ -153,6 +154,75 @@ body {
     font-weight: 700;
     display: grid;
     place-items: center;
+}
+
+.notification-panel {
+    position: absolute;
+    top: 56px;
+    right: 170px;
+    width: min(380px, 92vw);
+    background: #fff;
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    box-shadow: var(--shadow);
+    padding: 14px;
+    z-index: 40;
+    display: none;
+}
+
+.notification-panel.open {
+    display: block;
+}
+
+.notification-panel h3 {
+    margin: 0 0 10px;
+    font-size: 16px;
+}
+
+.notification-list {
+    display: grid;
+    gap: 8px;
+    max-height: 280px;
+    overflow-y: auto;
+}
+
+.notification-item {
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 10px;
+    background: #fff;
+    font-size: 13px;
+    line-height: 1.4;
+}
+
+.notification-row {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 10px;
+}
+
+.notification-clear {
+    border: none;
+    background: #f1f4f9;
+    color: #475467;
+    width: 24px;
+    height: 24px;
+    border-radius: 999px;
+    font-size: 12px;
+    font-weight: 700;
+    cursor: pointer;
+    flex: 0 0 auto;
+}
+
+.notification-clear:hover {
+    background: #e4eaf3;
+}
+
+.notification-time {
+    margin-top: 6px;
+    color: var(--text-soft);
+    font-size: 12px;
 }
 
 .addAgencyBtn,.logout,
@@ -470,6 +540,11 @@ footer {
     .topbar-actions {
         width: 100%;
         justify-content: space-between;
+    }
+
+    .notification-panel {
+        right: 0;
+        top: 58px;
     }
 
     .hero-banner,

@@ -1,52 +1,137 @@
-
-
 const agencyList = document.getElementById("agencyList");
 const form = document.getElementById("agencyForm");
 const formMessage = document.getElementById("formMessage");
 const viewMoreBtn = document.querySelector(".viewMore");
+const notificationBell = document.getElementById("notificationBell");
+const notificationPanel = document.getElementById("notificationPanel");
+const notificationList = document.getElementById("notificationList");
+const notificationCount = document.getElementById("notificationCount");
 
-const DEFAULT_IMAGE = "https://images.unsplash.com/photo-1694634003335-3e0add3b02c0?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&q=80&w=400";
+const DEFAULT_IMAGE = "/api/media/agency-image?seed=default&name=Agency";
+const mmUserId = localStorage.getItem("userId") || "";
+
 let allAgencies = [];
 let currentIndex = 0;
 const agenciesPerPage = 3;
-const UNSPLASH_KEY = "otZ95zyUV1GOBepx8Im9xusaLNGzrjoAX_XNfuYU-pY";
 
-async function fetchAgencyImage() {
-    try {
-        const res = await fetch(`https://api.unsplash.com/photos/random?query=agency,office,marketing&client_id=${UNSPLASH_KEY}`);
-        const data = await res.json();
-        return data?.urls?.small || DEFAULT_IMAGE;
-    } catch {
-        return DEFAULT_IMAGE;
-    }
+async function fetchAgencyImage(query = "agency office marketing") {
+    return getUniqueFallbackImage(`agency-${query}-${Date.now()}`);
 }
 
-function createAgencyCard(agencyName, imageUrl = DEFAULT_IMAGE) {
+function formatDate(isoDate) {
+    if (!isoDate) return "";
+    return new Date(isoDate).toLocaleString();
+}
+
+function escapeHtml(value) {
+    return String(value || "")
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#39;");
+}
+
+function createAgencyCard(agency) {
     const card = document.createElement("div");
     card.className = "agency-card";
 
     const img = document.createElement("img");
-    img.src = imageUrl;
+    img.src = agency.displayImageUrl || agency.imageUrl || DEFAULT_IMAGE;
+    img.alt = agency.name;
+    img.addEventListener("error", () => {
+        img.src = getUniqueFallbackImage(`agency-img-${agency._id || agency.name || Date.now()}`);
+    }, { once: true });
 
     const name = document.createElement("h3");
-    name.textContent = agencyName;
+    name.textContent = agency.name;
 
     card.appendChild(img);
     card.appendChild(name);
 
     card.addEventListener("click", () => {
-        window.location.href = `agency.html?name=${encodeURIComponent(agencyName)}`;
+        window.location.href = `create_brief.html?agencyId=${agency._id}`;
     });
 
     agencyList.appendChild(card);
 }
 
+function getUniqueFallbackImage(seedValue) {
+    return `/api/media/agency-image?seed=${encodeURIComponent(seedValue)}&name=${encodeURIComponent("Agency Partner")}`;
+}
+
+function hydrateAgencyImages(agencies) {
+    const used = new Set();
+
+    return agencies.map(agency => {
+        let resolvedUrl = agency.imageUrl || "";
+        if (!resolvedUrl || used.has(resolvedUrl)) {
+            resolvedUrl = getUniqueFallbackImage(`agency-${agency.name}-${agency._id || Date.now()}`);
+        }
+        used.add(resolvedUrl);
+        return { ...agency, displayImageUrl: resolvedUrl };
+    });
+}
+
+function renderNotifications(notes) {
+    const unread = notes.filter(note => !note.read).length;
+    notificationCount.textContent = String(unread);
+
+    if (!unread) {
+        notificationList.innerHTML = `<div class="notification-item">No new notifications.</div>`;
+        return;
+    }
+
+    const unreadNotes = notes.filter(note => !note.read);
+    notificationList.innerHTML = "";
+
+    unreadNotes.forEach(note => {
+        const item = document.createElement("div");
+        item.className = "notification-item";
+        item.innerHTML = `
+            <div class="notification-row">
+                <div>${escapeHtml(note.message)}</div>
+                <button class="notification-clear" data-note-id="${escapeHtml(note._id)}" aria-label="Clear notification">X</button>
+            </div>
+            <div class="notification-time">${formatDate(note.createdAt)}</div>
+        `;
+        const clearBtn = item.querySelector(".notification-clear");
+        clearBtn.addEventListener("click", () => clearNotification(note._id));
+        notificationList.appendChild(item);
+    });
+}
+
+async function loadNotifications() {
+    if (!mmUserId) {
+        notificationCount.textContent = "0";
+        notificationList.innerHTML = `<div class="notification-item">No notifications yet.</div>`;
+        return;
+    }
+    try {
+        const res = await fetch(`/api/notifications?userId=${encodeURIComponent(mmUserId)}`);
+        const notes = await res.json();
+        renderNotifications(Array.isArray(notes) ? notes : []);
+    } catch {
+        renderNotifications([]);
+    }
+}
+
+async function clearNotification(notificationId) {
+    if (!notificationId) return;
+    try {
+        await fetch(`/api/notifications/${encodeURIComponent(notificationId)}/read`, {
+            method: "PATCH"
+        });
+        await loadNotifications();
+    } catch (err) {
+        console.error(err);
+    }
+}
+
 async function showMoreAgencies() {
     const nextIndex = currentIndex + agenciesPerPage;
-
     for (let i = currentIndex; i < nextIndex && i < allAgencies.length; i++) {
-        const imageUrl = await fetchAgencyImage();
-        createAgencyCard(allAgencies[i].name, imageUrl);
+        createAgencyCard(allAgencies[i]);
     }
 
     currentIndex = nextIndex;
@@ -56,7 +141,8 @@ async function showMoreAgencies() {
 async function loadAgencies() {
     try {
         const res = await fetch("/api/agencies");
-        allAgencies = await res.json();
+        const agencies = await res.json();
+        allAgencies = hydrateAgencyImages(Array.isArray(agencies) ? agencies : []);
         agencyList.innerHTML = "";
         currentIndex = 0;
         showMoreAgencies();
@@ -65,71 +151,83 @@ async function loadAgencies() {
     }
 }
 
-async function addNewAgency(agencyName) {
-    const imageUrl = await fetchAgencyImage();
-    allAgencies.push({ name: agencyName });
-    createAgencyCard(agencyName, imageUrl);
-    viewMoreBtn.style.display = currentIndex < allAgencies.length ? "block" : "none";
-}
-
 viewMoreBtn.addEventListener("click", showMoreAgencies);
 
 form.addEventListener("submit", async (e) => {
     e.preventDefault();
-    const formData = {
-        name: document.getElementById("agencyName").value,
-        contactPerson: document.getElementById("contactPerson").value,
-        username: document.getElementById("username").value,
-        password: document.getElementById("password").value
-    };
 
+    const name = document.getElementById("agencyName").value.trim();
+    const contactPerson = document.getElementById("contactPerson").value.trim();
+    const phoneNumber = document.getElementById("phoneNumber").value.trim();
+    const username = document.getElementById("username").value.trim();
+    const password = document.getElementById("password").value;
+    const description = document.getElementById("description").value.trim();
+
+    const formData = { name, contactPerson, phoneNumber, username, password, description };
     if (Object.values(formData).some(v => !v)) {
-        formMessage.textContent = "Please fill all fields";
-        formMessage.className = "form-message error";
+        setMessage("Please fill all fields", "error");
         return;
     }
 
     try {
+        const existingUrls = new Set(allAgencies.map(a => a.displayImageUrl || a.imageUrl).filter(Boolean));
+        let imageUrl = "";
+
+        for (let i = 0; i < 5; i++) {
+            const candidate = await fetchAgencyImage(`${name} advertising office`);
+            if (!existingUrls.has(candidate)) {
+                imageUrl = candidate;
+                break;
+            }
+        }
+
+        if (!imageUrl) {
+            imageUrl = getUniqueFallbackImage(`agency-${name}-${Date.now()}`);
+        }
+
+        const payload = { ...formData, imageUrl };
+
         const res = await fetch("/api/agencies", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(formData)
+            body: JSON.stringify(payload)
         });
 
+        const data = await res.json();
         if (!res.ok) {
-            const data = await res.json();
-            setMessage(data.message, "error");
+            setMessage(data.message || "Failed to create agency", "error");
             return;
         }
 
-        await addNewAgency(formData.name);
+        if (data.agency) {
+            allAgencies = hydrateAgencyImages([data.agency, ...allAgencies]);
+            agencyList.innerHTML = "";
+            currentIndex = 0;
+            showMoreAgencies();
+        }
+
         setMessage("Agency created successfully!", "success");
         setTimeout(closeModal, 1200);
-
-    } catch (err) {
+    } catch {
         setMessage("Server error", "error");
     }
 });
 
-loadAgencies();
-
-// ================= MESSAGE =================
 function setMessage(message, type) {
     formMessage.textContent = message;
     formMessage.className = `form-message ${type}`;
 }
 
-// ================= MODAL =================
 window.openModal = () => {
     document.getElementById("agencyModal").style.display = "flex";
 };
+
 window.closeModal = () => {
     document.getElementById("agencyModal").style.display = "none";
     form.reset();
     setMessage("", "");
 };
 
-// ================= SLIDESHOW =================
 let slides = document.querySelectorAll(".slide");
 let index = 0;
 function showSlides() {
@@ -138,10 +236,26 @@ function showSlides() {
     if (index > slides.length) index = 1;
     slides[index - 1].classList.add("active");
 }
-setInterval(showSlides, 5000); // start slideshow
+setInterval(showSlides, 5000);
 
-// ================= LOGOUT =================
 window.logout = () => {
     localStorage.clear();
     window.location.href = "/LOGIN.html";
 };
+
+notificationBell?.addEventListener("click", () => {
+    notificationPanel.classList.toggle("open");
+});
+
+document.addEventListener("click", (event) => {
+    if (!notificationPanel || !notificationBell) return;
+    const clickInsidePanel = notificationPanel.contains(event.target);
+    const clickOnBell = notificationBell.contains(event.target);
+    if (!clickInsidePanel && !clickOnBell) {
+        notificationPanel.classList.remove("open");
+    }
+});
+
+loadAgencies();
+loadNotifications();
+setInterval(loadNotifications, 30000);

@@ -1,6 +1,6 @@
 const mongoose = require("mongoose");
 const bcrypt = require("bcrypt");
-const User = require("./models/User");
+const User = require("./models/user");
 
 mongoose.connect("mongodb://127.0.0.1:27017/nestleDB")
 .then(() => console.log("MongoDB Connected"))

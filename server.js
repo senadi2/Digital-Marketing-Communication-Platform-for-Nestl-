@@ -1,177 +1,384 @@
-// ================= IMPORTS =================
 const express = require("express");
 const mongoose = require("mongoose");
 const cors = require("cors");
 const path = require("path");
 const bcrypt = require("bcrypt");
 
-// ================= INIT APP =================
 const app = express();
 
-// ================= MIDDLEWARE =================
 app.use(cors());
-app.use(express.json());
-
-// ✅ Serve frontend
+app.use(express.json({ limit: "30mb" }));
 app.use(express.static(path.join(__dirname, "public")));
 
-// ================= DATABASE =================
 mongoose.connect("mongodb://127.0.0.1:27017/nestleDB")
-    .then(() => console.log("✅ MongoDB Connected"))
-    .catch(err => console.log("❌ MongoDB Error:", err));
+    .then(() => console.log("MongoDB Connected"))
+    .catch(err => console.log("MongoDB Error:", err));
 
-// ================= MODELS =================
-const User = require("./models/User");
-const Agency = require("./models/Agency");
-const Campaign = require("./models/Campaign");
-const Notification = require("./models/Notification");
+const User = require("./models/user");
+const Agency = require("./models/agency");
+const Campaign = require("./models/campaign");
+const Notification = require("./models/notification");
 
-// ================= ROUTES =================
-// Test route
+const ALLOWED_CAMPAIGN_STATUSES = new Set(["Accepted", "Decline"]);
+
+function hashString(input) {
+    let hash = 0;
+    const value = String(input || "");
+    for (let i = 0; i < value.length; i++) {
+        hash = ((hash << 5) - hash) + value.charCodeAt(i);
+        hash |= 0;
+    }
+    return Math.abs(hash);
+}
+
+function buildAgencyImageUrl(agencyName, uniqueKey) {
+    const keyToken = encodeURIComponent(String(uniqueKey || Date.now()));
+    const nameToken = encodeURIComponent(String(agencyName || "Agency"));
+    return `/api/media/agency-image?seed=${keyToken}&name=${nameToken}`;
+}
+
+function buildCampaignImageUrl(campaignTitle, uniqueKey) {
+    const keyToken = encodeURIComponent(String(uniqueKey || Date.now()));
+    const titleToken = encodeURIComponent(String(campaignTitle || "Campaign"));
+    return `/api/media/campaign-image?seed=${keyToken}&title=${titleToken}`;
+}
+
+function normalizeCampaignStatus(status) {
+    const value = String(status || "").trim().toLowerCase();
+    if (value === "accepted") return "Accepted";
+    if (value === "decline" || value === "declined") return "Decline";
+    return "Pending";
+}
+
 app.get("/", (req, res) => {
-    res.send("API is working 🚀");
+    res.send("API is working");
 });
 
-// ================= LOGIN API =================
+app.get("/api/media/agency-image", (req, res) => {
+    const seed = req.query.seed || Date.now();
+    const name = req.query.name || "Agency Partner";
+    const sig = hashString(`agency-${seed}-${name}`);
+    res.redirect(`https://picsum.photos/seed/agency-${sig}/1200/700`);
+});
+
+app.get("/api/media/campaign-image", (req, res) => {
+    const seed = req.query.seed || Date.now();
+    const title = req.query.title || "Campaign Brief";
+    const sig = hashString(`campaign-${seed}-${title}`);
+    res.redirect(`https://picsum.photos/seed/campaign-${sig}/1200/700`);
+});
+
 app.post("/api/login", async (req, res) => {
     try {
         const { username, password } = req.body;
-
         const user = await User.findOne({ username });
+        if (!user) return res.status(401).json({ message: "Invalid login" });
 
-        if (!user) {
-            return res.status(401).json({ message: "Invalid login" });
-        }
-
-        // Compare password
         const isMatch = await bcrypt.compare(password, user.password);
-        if (!isMatch) {
-            return res.status(401).json({ message: "Invalid login" });
-        }
+        if (!isMatch) return res.status(401).json({ message: "Invalid login" });
 
         res.json({
             message: "Login successful",
+            userId: String(user._id),
             role: user.role,
             agencyId: user.agencyId || null
         });
-
     } catch (err) {
         console.log(err);
         res.status(500).json({ message: "Server error" });
     }
 });
 
-
-// ================= AGENCY API =================
-
-// Add agency (Marketing Manager only)
 app.post("/api/agencies", async (req, res) => {
     try {
-        const { name, username, password, contactPerson } = req.body;
+        const {
+            name,
+            username,
+            password,
+            contactPerson,
+            phoneNumber = "",
+            description = "",
+            imageUrl = ""
+        } = req.body;
 
-        // Check required fields
         if (!name || !username || !contactPerson || !password) {
             return res.status(400).json({ message: "All fields required" });
         }
 
-        // Check if username already exists
         const exists = await User.findOne({ username });
         if (exists) return res.status(400).json({ message: "Username already exists" });
 
-        // Hash password
         const hashedPassword = await bcrypt.hash(password, 10);
 
-        // Create Agency
-        const newAgency = new Agency({
+        const resolvedImageUrl = imageUrl || buildAgencyImageUrl(name, `${name}-${Date.now()}`);
+
+        const newAgency = await Agency.create({
             name,
             username,
-            contactPerson
+            contactPerson,
+            phoneNumber,
+            description,
+            imageUrl: resolvedImageUrl
         });
-        await newAgency.save();
 
-        // Create User login for agency
-        const newUser = new User({
+        await User.create({
             username,
             password: hashedPassword,
             role: "Agency",
-            agencyId: newAgency._id
+            agencyId: String(newAgency._id)
         });
-        await newUser.save();
 
-        res.status(201).json({ message: "Agency + Login created successfully" });
-
+        res.status(201).json({
+            message: "Agency + Login created successfully",
+            agency: newAgency
+        });
     } catch (err) {
         console.log(err);
         res.status(500).json({ message: "Error adding agency" });
     }
 });
 
-// Get all agencies
 app.get("/api/agencies", async (req, res) => {
     try {
-        const agencies = await Agency.find();
-        res.json(agencies);
+        const agencies = await Agency.find().sort({ createdAt: -1 });
+
+        const usedImages = new Set();
+        const normalized = agencies.map((agency) => {
+            const json = agency.toObject();
+            let nextImage = buildAgencyImageUrl(json.name, json._id);
+            if (usedImages.has(nextImage)) {
+                nextImage = buildAgencyImageUrl(json.name, `${json._id}-${Date.now()}`);
+            }
+
+            usedImages.add(nextImage);
+            return { ...json, imageUrl: nextImage };
+        });
+
+        res.json(normalized);
     } catch (err) {
         console.log(err);
         res.status(500).json({ message: "Error fetching agencies" });
     }
 });
 
-// ================= CAMPAIGN API =================
+app.get("/api/agencies/:id", async (req, res) => {
+    try {
+        const agency = await Agency.findById(req.params.id);
+        if (!agency) return res.status(404).json({ message: "Agency not found" });
 
-// Create campaign
+        const json = agency.toObject();
+        json.imageUrl = buildAgencyImageUrl(json.name, json._id);
+
+        res.json(json);
+    } catch (err) {
+        console.log(err);
+        res.status(500).json({ message: "Error fetching agency" });
+    }
+});
+
 app.post("/api/campaigns", async (req, res) => {
     try {
-        const campaign = new Campaign(req.body);
-        await campaign.save();
+        const {
+            title,
+            targetAudience = "",
+            budgetRange = "",
+            startDate = "",
+            endDate = "",
+            description = "",
+            objectives = "",
+            attachments = [],
+            agencyId,
+            mmId
+        } = req.body;
 
-        res.json({ message: "Campaign created" });
+        if (!title || !agencyId || !mmId) {
+            return res.status(400).json({ message: "title, agencyId and mmId are required" });
+        }
+
+        const agency = await Agency.findById(agencyId);
+        if (!agency) return res.status(404).json({ message: "Agency not found" });
+
+        const campaign = await Campaign.create({
+            title,
+            targetAudience,
+            budgetRange,
+            startDate,
+            endDate,
+            description,
+            objectives,
+            attachments: Array.isArray(attachments) ? attachments.map((file) => ({
+                fileName: String(file.fileName || ""),
+                mimeType: String(file.mimeType || "application/octet-stream"),
+                size: Number(file.size || 0),
+                dataBase64: String(file.dataBase64 || "")
+            })) : [],
+            agencyId,
+            mmId,
+            status: "Pending"
+        });
+
+        await Notification.create({
+            userId: String(agency._id),
+            fromUserId: mmId,
+            type: "campaign_request",
+            message: `New campaign request: "${campaign.title}"`,
+            campaignId: String(campaign._id),
+            campaignTitle: campaign.title,
+            status: "Pending"
+        });
+
+        res.status(201).json(campaign);
     } catch (err) {
         console.log(err);
         res.status(500).json({ message: "Error creating campaign" });
     }
 });
 
-// Get campaigns by agency
 app.get("/api/campaigns", async (req, res) => {
     try {
-        const { agencyId } = req.query;
-        const campaigns = await Campaign.find({ agencyId });
-        res.json(campaigns);
+        const { agencyId, status } = req.query;
+        const filters = {};
+        if (agencyId) filters.agencyId = agencyId;
+        if (status) filters.status = normalizeCampaignStatus(status);
+
+        const campaigns = await Campaign.find(filters)
+            .select("-attachments.dataBase64")
+            .sort({ createdAt: -1 });
+        const normalized = campaigns.map((campaign) => {
+            const json = campaign.toObject();
+            json.status = normalizeCampaignStatus(json.status);
+            return json;
+        });
+        res.json(normalized);
     } catch (err) {
         console.log(err);
         res.status(500).json({ message: "Error fetching campaigns" });
     }
 });
 
-// ================= NOTIFICATION API =================
+app.get("/api/campaigns/:id", async (req, res) => {
+    try {
+        const campaign = await Campaign.findById(req.params.id);
+        if (!campaign) return res.status(404).json({ message: "Campaign not found" });
 
-// Send notification
+        const json = campaign.toObject();
+        json.status = normalizeCampaignStatus(json.status);
+        res.json(json);
+    } catch (err) {
+        console.log(err);
+        res.status(500).json({ message: "Error fetching campaign details" });
+    }
+});
+
+app.patch("/api/campaigns/:id/status", async (req, res) => {
+    try {
+        const { status, agencyId } = req.body;
+        const normalizedStatus = normalizeCampaignStatus(status);
+        if (!ALLOWED_CAMPAIGN_STATUSES.has(normalizedStatus)) {
+            return res.status(400).json({ message: "Invalid status" });
+        }
+
+        const campaign = await Campaign.findById(req.params.id);
+        if (!campaign) return res.status(404).json({ message: "Campaign not found" });
+
+        if (agencyId && campaign.agencyId !== agencyId) {
+            return res.status(403).json({ message: "Campaign does not belong to this agency" });
+        }
+
+        campaign.status = normalizedStatus;
+        await campaign.save();
+
+        const agency = await Agency.findById(campaign.agencyId);
+        const agencyName = agency?.name || "Agency";
+        const statusText = normalizedStatus;
+
+        await Notification.create({
+            userId: campaign.mmId,
+            fromUserId: campaign.agencyId,
+            type: "campaign_reply",
+            message: `${agencyName} ${statusText} campaign "${campaign.title}"`,
+            campaignId: String(campaign._id),
+            campaignTitle: campaign.title,
+            status: normalizedStatus
+        });
+
+        await Notification.updateMany(
+            {
+                userId: campaign.agencyId,
+                campaignId: String(campaign._id),
+                type: "campaign_request"
+            },
+            { $set: { status: normalizedStatus, read: true } }
+        );
+
+        res.json({ message: `Campaign ${statusText}`, campaign });
+    } catch (err) {
+        console.log(err);
+        res.status(500).json({ message: "Error updating campaign status" });
+    }
+});
+
 app.post("/api/notifications", async (req, res) => {
     try {
-        const notification = new Notification(req.body);
-        await notification.save();
-
-        res.json({ message: "Notification sent" });
+        const notification = await Notification.create(req.body);
+        res.json(notification);
     } catch (err) {
         console.log(err);
         res.status(500).json({ message: "Error sending notification" });
     }
 });
 
-// Get notifications
 app.get("/api/notifications", async (req, res) => {
     try {
-        const { userId } = req.query;
-        const notes = await Notification.find({ userId });
-        res.json(notes);
+        const { userId, unreadOnly } = req.query;
+        if (!userId) return res.status(400).json({ message: "userId is required" });
+
+        const filters = { userId };
+        if (unreadOnly === "true") filters.read = false;
+
+        const notes = await Notification.find(filters).sort({ createdAt: -1 });
+        const normalized = notes.map((note) => {
+            const json = note.toObject();
+            if (json.type === "campaign_request" || json.type === "campaign_reply") {
+                json.status = normalizeCampaignStatus(json.status);
+            }
+            return json;
+        });
+        res.json(normalized);
     } catch (err) {
         console.log(err);
         res.status(500).json({ message: "Error fetching notifications" });
     }
 });
 
-// ================= START SERVER =================
+app.patch("/api/notifications/:id/read", async (req, res) => {
+    try {
+        const updated = await Notification.findByIdAndUpdate(
+            req.params.id,
+            { read: true },
+            { new: true }
+        );
+        if (!updated) return res.status(404).json({ message: "Notification not found" });
+        res.json(updated);
+    } catch (err) {
+        console.log(err);
+        res.status(500).json({ message: "Error updating notification" });
+    }
+});
+
+app.patch("/api/notifications/read-all", async (req, res) => {
+    try {
+        const { userId } = req.body;
+        if (!userId) return res.status(400).json({ message: "userId is required" });
+
+        await Notification.updateMany({ userId, read: false }, { $set: { read: true } });
+        res.json({ message: "Notifications marked as read" });
+    } catch (err) {
+        console.log(err);
+        res.status(500).json({ message: "Error updating notifications" });
+    }
+});
+
 app.listen(3000, () => {
-    console.log("🚀 Server running on http://localhost:3000");
+    console.log("Server running on http://localhost:3000");
 });

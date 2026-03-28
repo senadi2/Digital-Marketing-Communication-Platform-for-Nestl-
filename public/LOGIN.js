@@ -19,8 +19,10 @@ async function login() {
 
         localStorage.setItem("userId", data.userId);
         localStorage.setItem("role", data.role);
+        localStorage.setItem("session.lastActivityAt", String(Date.now()));
 
         if (data.role === "MarketingManager") {
+            localStorage.removeItem("agencyId");
             window.location.href = "/MM_dash.html";
             return;
         }

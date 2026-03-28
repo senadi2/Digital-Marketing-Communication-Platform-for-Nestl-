@@ -207,6 +207,10 @@ document.addEventListener("click", (event) => {
 });
 
 logoutBtn?.addEventListener("click", () => {
+    if (window.AppSession?.logout) {
+        window.AppSession.logout("manual");
+        return;
+    }
     localStorage.clear();
     window.location.href = "/LOGIN.html";
 });

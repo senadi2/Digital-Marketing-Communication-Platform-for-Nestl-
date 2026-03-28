@@ -117,13 +117,13 @@
       <input id="agencyName" type="text" placeholder="Advertising Agency Name" required>
       <input id="contactPerson" type="text" placeholder="Contact Person" required>
       <input id="phoneNumber" type="tel" placeholder="Phone Number" required>
-      <input id="username" type="text" placeholder="Username" required>
+      <input id="username" type="email" placeholder="agency@aanestle.com" required>
       <input id="password" type="password" placeholder="Password" required>
       <input id="description" type="text" placeholder="Description" required>
 
       <div class="modal-actions">
         <button type="button" class="secondary-btn" onclick="closeModal()">Cancel</button>
-        <button type="submit" class="primary-btn">Send Invite &amp; Create Agency</button>
+        <button type="submit" class="primary-btn">Create Agency</button>
       </div>
 
       <p id="formMessage" class="form-message" aria-live="polite"></p>
@@ -131,6 +131,7 @@
   </div>
 </div>
 
+<script src="session_timeout.js"></script>
 <script src="MM_Dash.js"></script>
 </body>
 </html>

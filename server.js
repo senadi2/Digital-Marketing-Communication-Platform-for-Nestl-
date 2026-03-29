@@ -10,9 +10,7 @@ app.use(cors());
 app.use(express.json({ limit: "30mb" }));
 app.use(express.static(path.join(__dirname, "public")));
 
-require("dotenv").config();
-
-mongoose.connect(process.env.MONGO_URI)
+mongoose.connect("mongodb://127.0.0.1:27017/nestleDB")
     .then(() => console.log("MongoDB Connected"))
     .catch(err => console.log("MongoDB Error:", err));
 
@@ -20,7 +18,6 @@ const User = require("./models/user");
 const Agency = require("./models/agency");
 const Campaign = require("./models/campaign");
 const Notification = require("./models/notification");
-const LoginAudit = require("./models/loginAudit");
 const LoginAudit = require("./models/loginAudit");
 
 const ALLOWED_CAMPAIGN_STATUSES = new Set(["Accepted", "Decline"]);
@@ -76,6 +73,7 @@ function resetFailedLogin(username, req) {
     const key = getLoginAttemptKey(username, req);
     failedLoginAttempts.delete(key);
 }
+
 function hashString(input) {
     let hash = 0;
     const value = String(input || "");
@@ -133,7 +131,7 @@ app.post("/api/login", async (req, res) => {
             await recordFailedLogin(username, req);
             return res.status(401).json({ message: "Invalid login" });
         }
-        
+
         const isMatch = await bcrypt.compare(password, user.password);
         if (!isMatch) {
             await recordFailedLogin(username, req);
@@ -196,9 +194,6 @@ app.post("/api/agencies", async (req, res) => {
         const resolvedImageUrl = imageUrl || buildAgencyImageUrl(name, `${name}-${Date.now()}`);
 
         const newAgency = await Agency.create({
-            name: normalizedName,
-            username: normalizedUsername,
-            contactPerson: normalizedContactPerson,
             name: normalizedName,
             username: normalizedUsername,
             contactPerson: normalizedContactPerson,
@@ -465,9 +460,8 @@ app.patch("/api/notifications/read-all", async (req, res) => {
     }
 });
 
-const PORT = process.env.PORT || 3000;
-
-app.listen(PORT, () => {
-    console.log(`Server running on port ${PORT}`);
+app.listen(3000, () => {
+    console.log("Server running on http://localhost:3000");
 });
+
 

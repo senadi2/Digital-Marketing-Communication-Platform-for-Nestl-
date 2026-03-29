@@ -21,7 +21,6 @@ const Agency = require("./models/agency");
 const Campaign = require("./models/campaign");
 const Notification = require("./models/notification");
 const LoginAudit = require("./models/loginAudit");
-const LoginAudit = require("./models/loginAudit");
 
 const ALLOWED_CAMPAIGN_STATUSES = new Set(["Accepted", "Decline"]);
 const AGENCY_EMAIL_DOMAIN = "@aanestle.com";
@@ -465,9 +464,7 @@ app.patch("/api/notifications/read-all", async (req, res) => {
     }
 });
 
-const PORT = process.env.PORT || 3000;
+const serverless = require("serverless-http");
 
-app.listen(PORT, () => {
-    console.log(`Server running on port ${PORT}`);
-});
-
+module.exports = app;      
+module.exports.handler = serverless(app); 

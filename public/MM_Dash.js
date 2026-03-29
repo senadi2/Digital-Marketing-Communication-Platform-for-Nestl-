@@ -9,6 +9,7 @@ const notificationCount = document.getElementById("notificationCount");
 
 const DEFAULT_IMAGE = "/api/media/agency-image?seed=default&name=Agency";
 const mmUserId = localStorage.getItem("userId") || "";
+const AGENCY_EMAIL_DOMAIN = "@aanestle.com";
 
 let allAgencies = [];
 let currentIndex = 0;
@@ -169,6 +170,24 @@ form.addEventListener("submit", async (e) => {
         return;
     }
 
+    const normalizedUsername = username.toLowerCase();
+    if (!normalizedUsername.endsWith(AGENCY_EMAIL_DOMAIN)) {
+        setMessage(`Agency email must end with ${AGENCY_EMAIL_DOMAIN}`, "error");
+        return;
+    }
+
+    const normalizedName = name.toLowerCase();
+    const normalizedContactPerson = contactPerson.toLowerCase();
+    const duplicateAgency = allAgencies.find((agency) => (
+        String(agency.name || "").trim().toLowerCase() === normalizedName
+        && String(agency.contactPerson || "").trim().toLowerCase() === normalizedContactPerson
+    ));
+
+    if (duplicateAgency) {
+        setMessage("Agency is already registered", "error");
+        return;
+    }
+
     try {
         const existingUrls = new Set(allAgencies.map(a => a.displayImageUrl || a.imageUrl).filter(Boolean));
         let imageUrl = "";
@@ -185,7 +204,7 @@ form.addEventListener("submit", async (e) => {
             imageUrl = getUniqueFallbackImage(`agency-${name}-${Date.now()}`);
         }
 
-        const payload = { ...formData, imageUrl };
+        const payload = { ...formData, username: normalizedUsername, imageUrl };
 
         const res = await fetch("/api/agencies", {
             method: "POST",
@@ -239,6 +258,10 @@ function showSlides() {
 setInterval(showSlides, 5000);
 
 window.logout = () => {
+    if (window.AppSession?.logout) {
+        window.AppSession.logout("manual");
+        return;
+    }
     localStorage.clear();
     window.location.href = "/LOGIN.html";
 };

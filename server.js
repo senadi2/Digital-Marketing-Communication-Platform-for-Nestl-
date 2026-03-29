@@ -21,8 +21,61 @@ const Agency = require("./models/agency");
 const Campaign = require("./models/campaign");
 const Notification = require("./models/notification");
 const LoginAudit = require("./models/loginAudit");
+const LoginAudit = require("./models/loginAudit");
 
 const ALLOWED_CAMPAIGN_STATUSES = new Set(["Accepted", "Decline"]);
+const AGENCY_EMAIL_DOMAIN = "@aanestle.com";
+const FAILED_LOGIN_LOG_THRESHOLD = 2;
+const failedLoginAttempts = new Map();
+
+function escapeRegex(value) {
+    return String(value || "").replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function getClientIp(req) {
+    const forwarded = req.headers["x-forwarded-for"];
+    if (typeof forwarded === "string" && forwarded.trim()) {
+        return forwarded.split(",")[0].trim();
+    }
+    return req.ip || req.socket?.remoteAddress || "unknown-ip";
+}
+
+function getLoginAttemptKey(username, req) {
+    const normalizedUsername = String(username || "").trim().toLowerCase() || "unknown-user";
+    const ip = getClientIp(req);
+    return `${normalizedUsername}|${ip}`;
+}
+
+async function recordFailedLogin(username, req) {
+    const key = getLoginAttemptKey(username, req);
+    const nextAttempts = (failedLoginAttempts.get(key) || 0) + 1;
+    failedLoginAttempts.set(key, nextAttempts);
+
+    if (nextAttempts === FAILED_LOGIN_LOG_THRESHOLD) {
+        const safeUsername = String(username || "").trim() || "unknown-user";
+        const ip = getClientIp(req);
+
+        console.warn(
+            `[SECURITY] Failed login threshold reached | user=${safeUsername} | ip=${ip} | attempts=${nextAttempts} | time=${new Date().toISOString()}`
+        );
+
+        try {
+            await LoginAudit.create({
+                username: safeUsername,
+                ip,
+                attempts: nextAttempts,
+                eventType: "failed_login_threshold"
+            });
+        } catch (auditErr) {
+            console.log("Failed to persist login audit:", auditErr.message || auditErr);
+        }
+    }
+}
+
+function resetFailedLogin(username, req) {
+    const key = getLoginAttemptKey(username, req);
+    failedLoginAttempts.delete(key);
+}
 const AGENCY_EMAIL_DOMAIN = "@aanestle.com";
 const FAILED_LOGIN_LOG_THRESHOLD = 2;
 const failedLoginAttempts = new Map();
@@ -128,13 +181,26 @@ app.post("/api/login", async (req, res) => {
         const username = String(req.body?.username || "").trim();
         const password = String(req.body?.password || "");
 
+        const username = String(req.body?.username || "").trim();
+        const password = String(req.body?.password || "");
+
         const user = await User.findOne({ username });
+        if (!user) {
+            await recordFailedLogin(username, req);
+            return res.status(401).json({ message: "Invalid login" });
+        }
         if (!user) {
             await recordFailedLogin(username, req);
             return res.status(401).json({ message: "Invalid login" });
         }
 
         const isMatch = await bcrypt.compare(password, user.password);
+        if (!isMatch) {
+            await recordFailedLogin(username, req);
+            return res.status(401).json({ message: "Invalid login" });
+        }
+
+        resetFailedLogin(username, req);
         if (!isMatch) {
             await recordFailedLogin(username, req);
             return res.status(401).json({ message: "Invalid login" });
@@ -189,6 +255,25 @@ app.post("/api/agencies", async (req, res) => {
         }
 
         const exists = await User.findOne({ username: normalizedUsername });
+        const normalizedName = String(name).trim();
+        const normalizedContactPerson = String(contactPerson).trim();
+
+        const normalizedUsername = String(username).trim().toLowerCase();
+        if (!normalizedUsername.endsWith(AGENCY_EMAIL_DOMAIN)) {
+            return res.status(400).json({
+                message: `Agency email must end with ${AGENCY_EMAIL_DOMAIN}`
+            });
+        }
+
+        const duplicateAgency = await Agency.findOne({
+            name: { $regex: `^${escapeRegex(normalizedName)}$`, $options: "i" },
+            contactPerson: { $regex: `^${escapeRegex(normalizedContactPerson)}$`, $options: "i" }
+        });
+        if (duplicateAgency) {
+            return res.status(400).json({ message: "Agency is already registered" });
+        }
+
+        const exists = await User.findOne({ username: normalizedUsername });
         if (exists) return res.status(400).json({ message: "Username already exists" });
 
         const hashedPassword = await bcrypt.hash(password, 10);
@@ -199,12 +284,16 @@ app.post("/api/agencies", async (req, res) => {
             name: normalizedName,
             username: normalizedUsername,
             contactPerson: normalizedContactPerson,
+            name: normalizedName,
+            username: normalizedUsername,
+            contactPerson: normalizedContactPerson,
             phoneNumber,
             description,
             imageUrl: resolvedImageUrl
         });
 
         await User.create({
+            username: normalizedUsername,
             username: normalizedUsername,
             password: hashedPassword,
             role: "Agency",

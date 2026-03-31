@@ -2,14 +2,13 @@ const mongoose = require("mongoose");
 const bcrypt = require("bcrypt");
 const User = require("./models/user");
 
-mongoose.connect(process.env.MONGO_URI)
-    .then(() => console.log("MongoDB Connected"))
-    .catch(err => console.log("MongoDB Error:", err));
-
+mongoose.connect("mongodb://127.0.0.1:27017/nestleDB")
+.then(() => console.log("MongoDB Connected"))
+.catch(err => console.log(err));
 
 async function seed() {
 
-    const hashedPassword = await bcrypt.hash("Manager@123", 10);
+    const hashedPassword = await bcrypt.hash("manager123", 10);
 
     await User.create({
         username: "manager@mmnestle.com",

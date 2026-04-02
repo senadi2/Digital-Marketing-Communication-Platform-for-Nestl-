@@ -1,8 +1,14 @@
 const express = require("express");
-const mongoose = require("mongoose");
 const cors = require("cors");
 const path = require("path");
 const bcrypt = require("bcrypt");
+const { getDb } = require("./firebase");
+
+const USERS_COLLECTION = "users";
+const AGENCIES_COLLECTION = "agencies";
+const CAMPAIGNS_COLLECTION = "campaigns";
+const NOTIFICATIONS_COLLECTION = "notifications";
+const LOGIN_AUDITS_COLLECTION = "loginAudits";
 
 const app = express();
 
@@ -10,21 +16,101 @@ app.use(cors());
 app.use(express.json({ limit: "30mb" }));
 app.use(express.static(path.join(__dirname, "public")));
 
-require("dotenv").config();
-mongoose.connect(process.env.MONGO_URI)
-    .then(() => console.log("MongoDB Connected"))
-    .catch(err => console.log("MongoDB Error:", err));
+let db = null;
+let dbInitializationError = null;
 
-const User = require("./models/user");
-const Agency = require("./models/agency");
-const Campaign = require("./models/campaign");
-const Notification = require("./models/notification");
-const LoginAudit = require("./models/loginAudit");
+try {
+    db = getDb();
+    console.log("Firestore Connected");
+} catch (err) {
+    dbInitializationError = err;
+    console.log("Firebase Error:", err.message || err);
+}
 
 const ALLOWED_CAMPAIGN_STATUSES = new Set(["Accepted", "Decline"]);
 const AGENCY_EMAIL_DOMAIN = "@aanestle.com";
 const FAILED_LOGIN_LOG_THRESHOLD = 2;
 const failedLoginAttempts = new Map();
+
+function requireDb(res) {
+    if (db) return true;
+
+    const details = dbInitializationError?.message || "Missing Firebase credentials";
+    res.status(500).json({
+        message: "Firebase is not configured. Set FIREBASE_SERVICE_ACCOUNT_JSON or FIREBASE_SERVICE_ACCOUNT_PATH before starting the server.",
+        details
+    });
+    return false;
+}
+
+function nowIso() {
+    return new Date().toISOString();
+}
+
+function mapDoc(doc) {
+    return {
+        _id: doc.id,
+        ...doc.data()
+    };
+}
+
+async function createDocument(collectionName, data) {
+    const timestamp = nowIso();
+    const payload = {
+        ...data,
+        createdAt: data.createdAt || timestamp,
+        updatedAt: timestamp
+    };
+
+    const docRef = await db.collection(collectionName).add(payload);
+    return { _id: docRef.id, ...payload };
+}
+
+async function getDocumentById(collectionName, id) {
+    if (!id) return null;
+
+    const doc = await db.collection(collectionName).doc(String(id)).get();
+    if (!doc.exists) return null;
+
+    return mapDoc(doc);
+}
+
+async function listDocuments(collectionName) {
+    const snapshot = await db.collection(collectionName).orderBy("createdAt", "desc").get();
+    return snapshot.docs.map(mapDoc);
+}
+
+async function updateDocument(collectionName, id, updates) {
+    const docRef = db.collection(collectionName).doc(String(id));
+    const existing = await docRef.get();
+
+    if (!existing.exists) return null;
+
+    const nextPayload = {
+        ...updates,
+        updatedAt: nowIso()
+    };
+
+    await docRef.set(nextPayload, { merge: true });
+    const updated = await docRef.get();
+    return mapDoc(updated);
+}
+
+async function findUserByUsername(username) {
+    const users = await listDocuments(USERS_COLLECTION);
+    return users.find((user) => String(user.username || "") === String(username || "")) || null;
+}
+
+async function findAgencyByNameAndContact(name, contactPerson) {
+    const normalizedName = String(name || "").trim().toLowerCase();
+    const normalizedContact = String(contactPerson || "").trim().toLowerCase();
+    const agencies = await listDocuments(AGENCIES_COLLECTION);
+
+    return agencies.find((agency) => (
+        String(agency.name || "").trim().toLowerCase() === normalizedName
+        && String(agency.contactPerson || "").trim().toLowerCase() === normalizedContact
+    )) || null;
+}
 
 function escapeRegex(value) {
     return String(value || "").replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
@@ -58,7 +144,7 @@ async function recordFailedLogin(username, req) {
         );
 
         try {
-            await LoginAudit.create({
+            await createDocument(LOGIN_AUDITS_COLLECTION, {
                 username: safeUsername,
                 ip,
                 attempts: nextAttempts,
@@ -124,10 +210,12 @@ app.get("/api/media/campaign-image", (req, res) => {
 
 app.post("/api/login", async (req, res) => {
     try {
+        if (!requireDb(res)) return;
+
         const username = String(req.body?.username || "").trim();
         const password = String(req.body?.password || "");
 
-        const user = await User.findOne({ username });
+        const user = await findUserByUsername(username);
         if (!user) {
             await recordFailedLogin(username, req);
             return res.status(401).json({ message: "Invalid login" });
@@ -143,7 +231,7 @@ app.post("/api/login", async (req, res) => {
 
         res.json({
             message: "Login successful",
-            userId: String(user._id),
+            userId: String(user._id || ""),
             role: user.role,
             agencyId: user.agencyId || null
         });
@@ -155,6 +243,8 @@ app.post("/api/login", async (req, res) => {
 
 app.post("/api/agencies", async (req, res) => {
     try {
+        if (!requireDb(res)) return;
+
         const {
             name,
             username,
@@ -179,22 +269,19 @@ app.post("/api/agencies", async (req, res) => {
             });
         }
 
-        const duplicateAgency = await Agency.findOne({
-            name: { $regex: `^${escapeRegex(normalizedName)}$`, $options: "i" },
-            contactPerson: { $regex: `^${escapeRegex(normalizedContactPerson)}$`, $options: "i" }
-        });
+        const duplicateAgency = await findAgencyByNameAndContact(normalizedName, normalizedContactPerson);
         if (duplicateAgency) {
             return res.status(400).json({ message: "Agency is already registered" });
         }
 
-        const exists = await User.findOne({ username: normalizedUsername });
+        const exists = await findUserByUsername(normalizedUsername);
         if (exists) return res.status(400).json({ message: "Username already exists" });
 
         const hashedPassword = await bcrypt.hash(password, 10);
 
         const resolvedImageUrl = imageUrl || buildAgencyImageUrl(name, `${name}-${Date.now()}`);
 
-        const newAgency = await Agency.create({
+        const newAgency = await createDocument(AGENCIES_COLLECTION, {
             name: normalizedName,
             username: normalizedUsername,
             contactPerson: normalizedContactPerson,
@@ -203,11 +290,11 @@ app.post("/api/agencies", async (req, res) => {
             imageUrl: resolvedImageUrl
         });
 
-        await User.create({
+        await createDocument(USERS_COLLECTION, {
             username: normalizedUsername,
             password: hashedPassword,
             role: "Agency",
-            agencyId: String(newAgency._id)
+            agencyId: String(newAgency._id || "")
         });
 
         res.status(201).json({
@@ -222,11 +309,13 @@ app.post("/api/agencies", async (req, res) => {
 
 app.get("/api/agencies", async (req, res) => {
     try {
-        const agencies = await Agency.find().sort({ createdAt: -1 });
+        if (!requireDb(res)) return;
+
+        const agencies = await listDocuments(AGENCIES_COLLECTION);
 
         const usedImages = new Set();
         const normalized = agencies.map((agency) => {
-            const json = agency.toObject();
+            const json = { ...agency };
             let nextImage = buildAgencyImageUrl(json.name, json._id);
             if (usedImages.has(nextImage)) {
                 nextImage = buildAgencyImageUrl(json.name, `${json._id}-${Date.now()}`);
@@ -245,10 +334,12 @@ app.get("/api/agencies", async (req, res) => {
 
 app.get("/api/agencies/:id", async (req, res) => {
     try {
-        const agency = await Agency.findById(req.params.id);
+        if (!requireDb(res)) return;
+
+        const agency = await getDocumentById(AGENCIES_COLLECTION, req.params.id);
         if (!agency) return res.status(404).json({ message: "Agency not found" });
 
-        const json = agency.toObject();
+        const json = { ...agency };
         json.imageUrl = buildAgencyImageUrl(json.name, json._id);
 
         res.json(json);
@@ -260,6 +351,8 @@ app.get("/api/agencies/:id", async (req, res) => {
 
 app.post("/api/campaigns", async (req, res) => {
     try {
+        if (!requireDb(res)) return;
+
         const {
             title,
             targetAudience = "",
@@ -277,10 +370,10 @@ app.post("/api/campaigns", async (req, res) => {
             return res.status(400).json({ message: "title, agencyId and mmId are required" });
         }
 
-        const agency = await Agency.findById(agencyId);
+        const agency = await getDocumentById(AGENCIES_COLLECTION, agencyId);
         if (!agency) return res.status(404).json({ message: "Agency not found" });
 
-        const campaign = await Campaign.create({
+        const campaign = await createDocument(CAMPAIGNS_COLLECTION, {
             title,
             targetAudience,
             budgetRange,
@@ -296,15 +389,16 @@ app.post("/api/campaigns", async (req, res) => {
             })) : [],
             agencyId,
             mmId,
-            status: "Pending"
+            status: "Pending",
+            rejectionReason: ""
         });
 
-        await Notification.create({
-            userId: String(agency._id),
+        await createDocument(NOTIFICATIONS_COLLECTION, {
+            userId: String(agency._id || ""),
             fromUserId: mmId,
             type: "campaign_request",
-            message: `New campaign request: "${campaign.title}"`,
-            campaignId: String(campaign._id),
+            message: `Campaign "${campaign.title}" has been assigned to your agency.`,
+            campaignId: String(campaign._id || ""),
             campaignTitle: campaign.title,
             status: "Pending"
         });
@@ -318,17 +412,25 @@ app.post("/api/campaigns", async (req, res) => {
 
 app.get("/api/campaigns", async (req, res) => {
     try {
-        const { agencyId, status } = req.query;
-        const filters = {};
-        if (agencyId) filters.agencyId = agencyId;
-        if (status) filters.status = normalizeCampaignStatus(status);
+        if (!requireDb(res)) return;
 
-        const campaigns = await Campaign.find(filters)
-            .select("-attachments.dataBase64")
-            .sort({ createdAt: -1 });
-        const normalized = campaigns.map((campaign) => {
-            const json = campaign.toObject();
+        const { agencyId, status } = req.query;
+        const campaigns = await listDocuments(CAMPAIGNS_COLLECTION);
+        const filters = campaigns.filter((campaign) => {
+            if (agencyId && campaign.agencyId !== agencyId) return false;
+            if (status && campaign.status !== normalizeCampaignStatus(status)) return false;
+            return true;
+        });
+        const normalized = filters.map((campaign) => {
+            const json = { ...campaign };
             json.status = normalizeCampaignStatus(json.status);
+            if (Array.isArray(json.attachments)) {
+                json.attachments = json.attachments.map((file) => ({
+                    fileName: file.fileName,
+                    mimeType: file.mimeType,
+                    size: file.size
+                }));
+            }
             return json;
         });
         res.json(normalized);
@@ -340,10 +442,12 @@ app.get("/api/campaigns", async (req, res) => {
 
 app.get("/api/campaigns/:id", async (req, res) => {
     try {
-        const campaign = await Campaign.findById(req.params.id);
+        if (!requireDb(res)) return;
+
+        const campaign = await getDocumentById(CAMPAIGNS_COLLECTION, req.params.id);
         if (!campaign) return res.status(404).json({ message: "Campaign not found" });
 
-        const json = campaign.toObject();
+        const json = { ...campaign };
         json.status = normalizeCampaignStatus(json.status);
         res.json(json);
     } catch (err) {
@@ -354,46 +458,64 @@ app.get("/api/campaigns/:id", async (req, res) => {
 
 app.patch("/api/campaigns/:id/status", async (req, res) => {
     try {
-        const { status, agencyId } = req.body;
+        if (!requireDb(res)) return;
+
+        const { status, agencyId, rejectionReason = "" } = req.body;
         const normalizedStatus = normalizeCampaignStatus(status);
         if (!ALLOWED_CAMPAIGN_STATUSES.has(normalizedStatus)) {
             return res.status(400).json({ message: "Invalid status" });
         }
 
-        const campaign = await Campaign.findById(req.params.id);
+        const normalizedRejectionReason = String(rejectionReason || "").trim();
+        if (normalizedStatus === "Decline" && !normalizedRejectionReason) {
+            return res.status(400).json({ message: "Rejection reason is required when declining a campaign" });
+        }
+
+        const campaign = await getDocumentById(CAMPAIGNS_COLLECTION, req.params.id);
         if (!campaign) return res.status(404).json({ message: "Campaign not found" });
 
         if (agencyId && campaign.agencyId !== agencyId) {
             return res.status(403).json({ message: "Campaign does not belong to this agency" });
         }
 
-        campaign.status = normalizedStatus;
-        await campaign.save();
+        const updatedCampaign = await updateDocument(CAMPAIGNS_COLLECTION, req.params.id, {
+            status: normalizedStatus,
+            rejectionReason: normalizedStatus === "Decline" ? normalizedRejectionReason : ""
+        });
 
-        const agency = await Agency.findById(campaign.agencyId);
+        const agency = await getDocumentById(AGENCIES_COLLECTION, campaign.agencyId);
         const agencyName = agency?.name || "Agency";
         const statusText = normalizedStatus;
+        const managerMessage = normalizedStatus === "Decline"
+            ? `${agencyName} declined campaign "${campaign.title}". Reason: ${normalizedRejectionReason}`
+            : `${agencyName} accepted campaign "${campaign.title}"`;
 
-        await Notification.create({
+        await createDocument(NOTIFICATIONS_COLLECTION, {
             userId: campaign.mmId,
             fromUserId: campaign.agencyId,
             type: "campaign_reply",
-            message: `${agencyName} ${statusText} campaign "${campaign.title}"`,
-            campaignId: String(campaign._id),
+            message: managerMessage,
+            campaignId: String(campaign._id || ""),
             campaignTitle: campaign.title,
-            status: normalizedStatus
+            status: normalizedStatus,
+            rejectionReason: normalizedStatus === "Decline" ? normalizedRejectionReason : ""
         });
 
-        await Notification.updateMany(
-            {
-                userId: campaign.agencyId,
-                campaignId: String(campaign._id),
-                type: "campaign_request"
-            },
-            { $set: { status: normalizedStatus, read: true } }
-        );
+        const notifications = await listDocuments(NOTIFICATIONS_COLLECTION);
+        const matchingNotifications = notifications.filter((note) => (
+            note.userId === campaign.agencyId
+            && note.campaignId === String(campaign._id || "")
+            && note.type === "campaign_request"
+        ));
 
-        res.json({ message: `Campaign ${statusText}`, campaign });
+        await Promise.all(matchingNotifications.map((note) => (
+            updateDocument(NOTIFICATIONS_COLLECTION, note._id, {
+                status: normalizedStatus,
+                read: true
+            })
+        )));
+
+        res.json({ message: `Campaign ${statusText}`, campaign: updatedCampaign });
     } catch (err) {
         console.log(err);
         res.status(500).json({ message: "Error updating campaign status" });
@@ -402,7 +524,9 @@ app.patch("/api/campaigns/:id/status", async (req, res) => {
 
 app.post("/api/notifications", async (req, res) => {
     try {
-        const notification = await Notification.create(req.body);
+        if (!requireDb(res)) return;
+
+        const notification = await createDocument(NOTIFICATIONS_COLLECTION, req.body);
         res.json(notification);
     } catch (err) {
         console.log(err);
@@ -412,15 +536,19 @@ app.post("/api/notifications", async (req, res) => {
 
 app.get("/api/notifications", async (req, res) => {
     try {
+        if (!requireDb(res)) return;
+
         const { userId, unreadOnly } = req.query;
         if (!userId) return res.status(400).json({ message: "userId is required" });
 
-        const filters = { userId };
-        if (unreadOnly === "true") filters.read = false;
-
-        const notes = await Notification.find(filters).sort({ createdAt: -1 });
-        const normalized = notes.map((note) => {
-            const json = note.toObject();
+        const notes = await listDocuments(NOTIFICATIONS_COLLECTION);
+        const filteredNotes = notes.filter((note) => {
+            if (note.userId !== userId) return false;
+            if (unreadOnly === "true" && note.read) return false;
+            return true;
+        });
+        const normalized = filteredNotes.map((note) => {
+            const json = { ...note };
             if (json.type === "campaign_request" || json.type === "campaign_reply") {
                 json.status = normalizeCampaignStatus(json.status);
             }
@@ -435,11 +563,9 @@ app.get("/api/notifications", async (req, res) => {
 
 app.patch("/api/notifications/:id/read", async (req, res) => {
     try {
-        const updated = await Notification.findByIdAndUpdate(
-            req.params.id,
-            { read: true },
-            { new: true }
-        );
+        if (!requireDb(res)) return;
+
+        const updated = await updateDocument(NOTIFICATIONS_COLLECTION, req.params.id, { read: true });
         if (!updated) return res.status(404).json({ message: "Notification not found" });
         res.json(updated);
     } catch (err) {
@@ -450,10 +576,18 @@ app.patch("/api/notifications/:id/read", async (req, res) => {
 
 app.patch("/api/notifications/read-all", async (req, res) => {
     try {
+        if (!requireDb(res)) return;
+
         const { userId } = req.body;
         if (!userId) return res.status(400).json({ message: "userId is required" });
 
-        await Notification.updateMany({ userId, read: false }, { $set: { read: true } });
+        const notifications = await listDocuments(NOTIFICATIONS_COLLECTION);
+        const unreadNotes = notifications.filter((note) => note.userId === userId && !note.read);
+
+        await Promise.all(unreadNotes.map((note) => (
+            updateDocument(NOTIFICATIONS_COLLECTION, note._id, { read: true })
+        )));
+
         res.json({ message: "Notifications marked as read" });
     } catch (err) {
         console.log(err);
@@ -461,9 +595,8 @@ app.patch("/api/notifications/read-all", async (req, res) => {
     }
 });
 
-const serverless = require("serverless-http");
-
-    module.exports = app;      
-    module.exports.handler = serverless(app);
+app.listen(3000, () => {
+    console.log("Server running on http://localhost:3000");
+});
 
 

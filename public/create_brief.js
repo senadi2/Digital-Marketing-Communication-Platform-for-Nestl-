@@ -142,6 +142,7 @@ function renderCampaigns(campaigns) {
             <p class="campaign-description">${escapeHtml(campaign.description)}</p>
             <p class="campaign-objectives">Objectives: ${escapeHtml(campaign.objectives)}</p>
             <span class="campaign-status ${escapeHtml(status)}">${escapeHtml(normalized)}</span>
+            ${normalized === "Decline" && campaign.rejectionReason ? `<p class="campaign-rejection-reason"><strong>Reason:</strong> ${escapeHtml(campaign.rejectionReason)}</p>` : ""}
         `;
         campaignList.appendChild(card);
     });

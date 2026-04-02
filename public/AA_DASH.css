@@ -169,8 +169,31 @@ body {
 }
 
 .notification-panel h3 {
-    margin: 0 0 10px;
+    margin: 0;
     font-size: 16px;
+}
+
+.notification-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 10px;
+}
+
+.notification-clear-all {
+    border: none;
+    background: #eef3fb;
+    color: var(--primary);
+    border-radius: 999px;
+    padding: 7px 12px;
+    font-size: 12px;
+    font-weight: 700;
+    cursor: pointer;
+}
+
+.notification-clear-all:hover {
+    background: #dde8fb;
 }
 
 .notification-list {
@@ -193,31 +216,6 @@ body {
     margin-top: 6px;
     color: var(--text-soft);
     font-size: 12px;
-}
-
-.notification-actions {
-    display: flex;
-    gap: 8px;
-    margin-top: 10px;
-}
-
-.notification-actions button {
-    border: none;
-    border-radius: 10px;
-    padding: 8px 10px;
-    cursor: pointer;
-    font-weight: 700;
-    font-size: 12px;
-}
-
-.notification-actions .accept-btn {
-    background: var(--primary);
-    color: #fff;
-}
-
-.notification-actions .decline-btn {
-    background: #d92d20;
-    color: #fff;
 }
 
 .logout,

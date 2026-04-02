@@ -175,8 +175,31 @@ body {
 }
 
 .notification-panel h3 {
-    margin: 0 0 10px;
+    margin: 0;
     font-size: 16px;
+}
+
+.notification-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 10px;
+}
+
+.notification-clear-all {
+    border: none;
+    background: #eef3fb;
+    color: var(--primary);
+    border-radius: 999px;
+    padding: 7px 12px;
+    font-size: 12px;
+    font-weight: 700;
+    cursor: pointer;
+}
+
+.notification-clear-all:hover {
+    background: #dde8fb;
 }
 
 .notification-list {

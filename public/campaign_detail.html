@@ -46,9 +46,25 @@
       <p id="objectives">-</p>
     </section>
 
+    <section class="detail-card" id="rejectionReasonSection" hidden>
+      <h2>Rejection Reason</h2>
+      <p id="rejectionReasonText">-</p>
+    </section>
+
     <section class="detail-card">
       <h2>Attachments</h2>
       <div id="attachmentList" class="attachment-list"></div>
+    </section>
+
+    <section class="detail-card" id="decisionCard" hidden>
+      <h2>Campaign Decision</h2>
+      <p class="decision-copy">Review the full brief before responding. If you decline, please tell the marketing manager why.</p>
+      <textarea id="rejectionReasonInput" rows="4" placeholder="Write the reason for rejecting this campaign"></textarea>
+      <p id="decisionMessage" class="decision-message" aria-live="polite"></p>
+      <div class="decision-actions">
+        <button type="button" class="secondary-btn" id="declineCampaignBtn">Decline Campaign</button>
+        <button type="button" class="primary-btn" id="acceptCampaignBtn">Accept Campaign</button>
+      </div>
     </section>
   </main>
 

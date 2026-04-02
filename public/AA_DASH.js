@@ -3,6 +3,7 @@ const notificationBell = document.getElementById("notificationBell");
 const notificationPanel = document.getElementById("notificationPanel");
 const notificationList = document.getElementById("notificationList");
 const notificationCount = document.getElementById("notificationCount");
+const clearAllNotificationsBtn = document.getElementById("clearAllNotificationsBtn");
 const logoutBtn = document.querySelector(".logout");
 const DEFAULT_IMAGE = "/api/media/campaign-image?seed=campaign-default&title=Nestle%20Campaign";
 
@@ -33,28 +34,6 @@ async function markNotificationRead(notificationId) {
         await fetch(`/api/notifications/${notificationId}/read`, { method: "PATCH" });
     } catch (err) {
         console.error(err);
-    }
-}
-
-async function updateCampaignStatus(campaignId, status, notificationId) {
-    try {
-        const res = await fetch(`/api/campaigns/${campaignId}/status`, {
-            method: "PATCH",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ status, agencyId })
-        });
-
-        const data = await res.json();
-        if (!res.ok) {
-            alert(data.message || "Failed to update campaign");
-            return;
-        }
-
-        await markNotificationRead(notificationId);
-        await Promise.all([loadCampaigns(), loadNotifications()]);
-    } catch (err) {
-        console.error(err);
-        alert("Error updating campaign status");
     }
 }
 
@@ -140,30 +119,10 @@ function renderNotifications(notes) {
     unreadNotes.forEach(note => {
         const item = document.createElement("div");
         item.className = "notification-item";
-
-        const isPendingRequest = note.type === "campaign_request" && String(note.status || "").toLowerCase() === "pending";
         item.innerHTML = `
             <div>${escapeHtml(note.message)}</div>
-            ${isPendingRequest ? `
-                <div class="notification-actions">
-                    <button class="accept-btn" data-campaign-id="${escapeHtml(note.campaignId)}" data-notification-id="${escapeHtml(note._id)}">Accept</button>
-                    <button class="decline-btn" data-campaign-id="${escapeHtml(note.campaignId)}" data-notification-id="${escapeHtml(note._id)}">Decline</button>
-                </div>
-            ` : ""}
+            <div class="notification-time">${escapeHtml(formatDate(note.createdAt))}</div>
         `;
-
-        if (isPendingRequest) {
-            const acceptBtn = item.querySelector(".accept-btn");
-            const declineBtn = item.querySelector(".decline-btn");
-
-            acceptBtn.addEventListener("click", () => {
-                updateCampaignStatus(acceptBtn.dataset.campaignId, "Accepted", acceptBtn.dataset.notificationId);
-            });
-
-            declineBtn.addEventListener("click", () => {
-                updateCampaignStatus(declineBtn.dataset.campaignId, "Decline", declineBtn.dataset.notificationId);
-            });
-        }
 
         notificationList.appendChild(item);
     });
@@ -193,8 +152,26 @@ async function loadNotifications() {
     }
 }
 
+async function clearAllNotifications() {
+    if (!agencyId) return;
+    try {
+        await fetch("/api/notifications/read-all", {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ userId: agencyId })
+        });
+        await loadNotifications();
+    } catch (err) {
+        console.error(err);
+    }
+}
+
 notificationBell?.addEventListener("click", () => {
     notificationPanel.classList.toggle("open");
+});
+
+clearAllNotificationsBtn?.addEventListener("click", () => {
+    clearAllNotifications();
 });
 
 document.addEventListener("click", (event) => {

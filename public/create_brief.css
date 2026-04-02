@@ -112,11 +112,16 @@ h2 {
 
 .campaign-meta,
 .campaign-description,
-.campaign-objectives {
+.campaign-objectives,
+.campaign-rejection-reason {
     margin: 8px 0 0;
     color: var(--text-soft);
     line-height: 1.5;
     font-size: 14px;
+}
+
+.campaign-rejection-reason strong {
+    color: #8f1d1d;
 }
 
 .campaign-status {

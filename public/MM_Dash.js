@@ -6,6 +6,7 @@ const notificationBell = document.getElementById("notificationBell");
 const notificationPanel = document.getElementById("notificationPanel");
 const notificationList = document.getElementById("notificationList");
 const notificationCount = document.getElementById("notificationCount");
+const clearAllNotificationsBtn = document.getElementById("clearAllNotificationsBtn");
 
 const DEFAULT_IMAGE = "/api/media/agency-image?seed=default&name=Agency";
 const mmUserId = localStorage.getItem("userId") || "";
@@ -122,6 +123,20 @@ async function clearNotification(notificationId) {
     try {
         await fetch(`/api/notifications/${encodeURIComponent(notificationId)}/read`, {
             method: "PATCH"
+        });
+        await loadNotifications();
+    } catch (err) {
+        console.error(err);
+    }
+}
+
+async function clearAllNotifications() {
+    if (!mmUserId) return;
+    try {
+        await fetch("/api/notifications/read-all", {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ userId: mmUserId })
         });
         await loadNotifications();
     } catch (err) {
@@ -268,6 +283,10 @@ window.logout = () => {
 
 notificationBell?.addEventListener("click", () => {
     notificationPanel.classList.toggle("open");
+});
+
+clearAllNotificationsBtn?.addEventListener("click", () => {
+    clearAllNotifications();
 });
 
 document.addEventListener("click", (event) => {

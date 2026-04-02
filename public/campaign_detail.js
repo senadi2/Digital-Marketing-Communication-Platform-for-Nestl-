@@ -10,6 +10,18 @@ const endDateEl = document.getElementById("endDate");
 const descriptionEl = document.getElementById("description");
 const objectivesEl = document.getElementById("objectives");
 const attachmentList = document.getElementById("attachmentList");
+const rejectionReasonSection = document.getElementById("rejectionReasonSection");
+const rejectionReasonText = document.getElementById("rejectionReasonText");
+const decisionCard = document.getElementById("decisionCard");
+const rejectionReasonInput = document.getElementById("rejectionReasonInput");
+const decisionMessage = document.getElementById("decisionMessage");
+const acceptCampaignBtn = document.getElementById("acceptCampaignBtn");
+const declineCampaignBtn = document.getElementById("declineCampaignBtn");
+
+const agencyId = localStorage.getItem("agencyId") || "";
+const role = localStorage.getItem("role") || "";
+
+let currentCampaign = null;
 
 function formatBytes(bytes) {
     if (!bytes || Number.isNaN(bytes)) return "0 B";
@@ -27,6 +39,17 @@ function normalizeStatus(status) {
 
 function statusClass(status) {
     return normalizeStatus(status).toLowerCase();
+}
+
+function setDecisionMessage(message, type = "") {
+    decisionMessage.textContent = message;
+    decisionMessage.className = `decision-message ${type}`.trim();
+}
+
+function toggleDecisionControls(disabled) {
+    acceptCampaignBtn.disabled = disabled;
+    declineCampaignBtn.disabled = disabled;
+    rejectionReasonInput.disabled = disabled;
 }
 
 function downloadAttachment(file) {
@@ -81,6 +104,8 @@ async function loadCampaignDetails() {
             throw new Error(campaign.message || "Failed to load campaign");
         }
 
+        currentCampaign = campaign;
+
         titleEl.textContent = campaign.title || "Campaign Detail";
         const normalizedStatus = normalizeStatus(campaign.status);
         statusEl.textContent = normalizedStatus;
@@ -92,6 +117,18 @@ async function loadCampaignDetails() {
         endDateEl.textContent = campaign.endDate || "-";
         descriptionEl.textContent = campaign.description || "-";
         objectivesEl.textContent = campaign.objectives || "-";
+        const reason = String(campaign.rejectionReason || "").trim();
+        rejectionReasonSection.hidden = !reason;
+        rejectionReasonText.textContent = reason || "-";
+
+        const isAgencyViewer = role === "Agency" && agencyId && campaign.agencyId === agencyId;
+        decisionCard.hidden = !(isAgencyViewer && normalizedStatus === "Pending");
+        if (decisionCard.hidden) {
+            setDecisionMessage("");
+        } else {
+            rejectionReasonInput.value = "";
+            setDecisionMessage("");
+        }
 
         renderAttachments(campaign.attachments || []);
     } catch (err) {
@@ -99,5 +136,53 @@ async function loadCampaignDetails() {
         descriptionEl.textContent = err.message || "Could not load campaign details.";
     }
 }
+
+async function submitDecision(status) {
+    if (!currentCampaign || !agencyId) return;
+
+    const rejectionReason = String(rejectionReasonInput.value || "").trim();
+    if (status === "Decline" && !rejectionReason) {
+        setDecisionMessage("Please add a reason before declining this campaign.", "error");
+        return;
+    }
+
+    try {
+        toggleDecisionControls(true);
+        setDecisionMessage("Saving your decision...");
+
+        const res = await fetch(`/api/campaigns/${encodeURIComponent(campaignId)}/status`, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+                status,
+                agencyId,
+                rejectionReason
+            })
+        });
+
+        const data = await res.json();
+        if (!res.ok) {
+            throw new Error(data.message || "Failed to update campaign");
+        }
+
+        setDecisionMessage(
+            status === "Accepted" ? "Campaign accepted successfully." : "Campaign declined successfully.",
+            "success"
+        );
+        await loadCampaignDetails();
+    } catch (err) {
+        setDecisionMessage(err.message || "Error updating campaign.", "error");
+    } finally {
+        toggleDecisionControls(false);
+    }
+}
+
+acceptCampaignBtn?.addEventListener("click", () => {
+    submitDecision("Accepted");
+});
+
+declineCampaignBtn?.addEventListener("click", () => {
+    submitDecision("Decline");
+});
 
 loadCampaignDetails();

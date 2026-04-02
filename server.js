@@ -10,7 +10,8 @@ app.use(cors());
 app.use(express.json({ limit: "30mb" }));
 app.use(express.static(path.join(__dirname, "public")));
 
-mongoose.connect("mongodb://127.0.0.1:27017/nestleDB")
+require("dotenv").config();
+mongoose.connect(process.env.MONGO_URI)
     .then(() => console.log("MongoDB Connected"))
     .catch(err => console.log("MongoDB Error:", err));
 
@@ -460,8 +461,9 @@ app.patch("/api/notifications/read-all", async (req, res) => {
     }
 });
 
-app.listen(3000, () => {
-    console.log("Server running on http://localhost:3000");
-});
+const serverless = require("serverless-http");
+
+    module.exports = app;      
+    module.exports.handler = serverless(app);
 
 

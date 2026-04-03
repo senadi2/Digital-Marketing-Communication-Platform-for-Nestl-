@@ -27,6 +27,12 @@ async function login() {
             return;
         }
 
+        if (data.role === "BrandManager") {
+            localStorage.removeItem("agencyId");
+            window.location.href = "/BM_dash.html";
+            return;
+        }
+
         if (data.role === "Agency") {
             localStorage.setItem("agencyId", data.agencyId || "");
             window.location.href = "/AA_DASH.html";

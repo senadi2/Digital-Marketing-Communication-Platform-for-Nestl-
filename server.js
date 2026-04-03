@@ -101,6 +101,11 @@ async function findUserByUsername(username) {
     return users.find((user) => String(user.username || "") === String(username || "")) || null;
 }
 
+async function findUsersByRole(role) {
+    const users = await listDocuments(USERS_COLLECTION);
+    return users.filter((user) => String(user.role || "") === String(role || ""));
+}
+
 async function findAgencyByNameAndContact(name, contactPerson) {
     const normalizedName = String(name || "").trim().toLowerCase();
     const normalizedContact = String(contactPerson || "").trim().toLowerCase();
@@ -500,6 +505,23 @@ app.patch("/api/campaigns/:id/status", async (req, res) => {
             status: normalizedStatus,
             rejectionReason: normalizedStatus === "Decline" ? normalizedRejectionReason : ""
         });
+
+        if (normalizedStatus === "Accepted") {
+            const brandManagers = await findUsersByRole("BrandManager");
+
+            await Promise.all(brandManagers.map((brandManager) => (
+                createDocument(NOTIFICATIONS_COLLECTION, {
+                    userId: String(brandManager._id || ""),
+                    fromUserId: campaign.agencyId,
+                    type: "campaign_reply",
+                    message: `${agencyName} accepted the "${campaign.title}" campaign.`,
+                    campaignId: String(campaign._id || ""),
+                    campaignTitle: campaign.title,
+                    status: normalizedStatus,
+                    rejectionReason: ""
+                })
+            )));
+        }
 
         const notifications = await listDocuments(NOTIFICATIONS_COLLECTION);
         const matchingNotifications = notifications.filter((note) => (

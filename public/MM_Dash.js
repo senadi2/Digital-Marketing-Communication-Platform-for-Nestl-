@@ -270,7 +270,7 @@ function showSlides() {
     if (index > slides.length) index = 1;
     slides[index - 1].classList.add("active");
 }
-setInterval(showSlides, 5000);
+setInterval(showSlides, 3000);
 
 window.logout = () => {
     if (window.AppSession?.logout) {

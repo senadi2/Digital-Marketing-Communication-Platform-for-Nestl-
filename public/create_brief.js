@@ -7,11 +7,21 @@ const openBriefModalBtn = document.getElementById("openBriefModalBtn");
 const closeBriefModalBtn = document.getElementById("closeBriefModalBtn");
 const campaignBriefForm = document.getElementById("campaignBriefForm");
 const briefFormMessage = document.getElementById("briefFormMessage");
+const dashboardBackLink = document.getElementById("dashboardBackLink");
 
 const params = new URLSearchParams(window.location.search);
 const agencyId = params.get("agencyId");
 const mmId = localStorage.getItem("userId") || "";
+const role = localStorage.getItem("role") || "";
 const FALLBACK_IMAGE = "/api/media/agency-image?seed=agency-brief-default&name=Agency";
+
+if (dashboardBackLink && role === "BrandManager") {
+    dashboardBackLink.href = "BM_dash.html";
+}
+
+if (role === "BrandManager") {
+    openBriefModalBtn.hidden = true;
+}
 
 if (!agencyId) {
     agencyDescriptionEl.textContent = "Agency not found. Please go back to dashboard and select an agency.";
@@ -153,7 +163,11 @@ async function loadCampaigns() {
     try {
         const res = await fetch(`/api/campaigns?agencyId=${encodeURIComponent(agencyId)}`);
         const campaigns = await res.json();
-        renderCampaigns(Array.isArray(campaigns) ? campaigns : []);
+        const normalizedCampaigns = Array.isArray(campaigns) ? campaigns : [];
+        const visibleCampaigns = role === "BrandManager"
+            ? normalizedCampaigns.filter((campaign) => normalizeStatus(campaign.status) !== "Decline")
+            : normalizedCampaigns;
+        renderCampaigns(visibleCampaigns);
     } catch (err) {
         console.error(err);
         renderCampaigns([]);

@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>KOALA by Nestle | Brand Manager</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+<link rel="icon" href="Images/faviconimg.png" type="image/png">
+<link rel="stylesheet" href="MM_DASH.CSS">
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+
+<body>
+<div class="container">
+  <aside class="sidebar">
+    <div class="logo">
+      <img src="Images/logo_nobackground.png" alt="Nestle platform logo">
+    </div>
+
+    <div class="sidebar-copy">
+      <h2>Total Visibility. Better Decisions. Faster Results.</h2>
+      <p class="sidebar-text">Built for speed, clarity, and stronger brand collaboration across every campaign.</p>
+    </div>
+
+    <ul class="nav">
+      <li class="active"><i class="fa-solid fa-house"></i><span>Home</span></li>
+      <li><i class="fa-solid fa-building-user"></i><a href="#agency-section"><span>Agencies</span></a></li>
+    </ul>
+  </aside>
+
+  <main class="main">
+    <div class="topbar">
+      <div class="topbar-meta">
+        <img src="Images/logo.svg" alt="Nestle logo">
+      </div>
+
+      <div class="topbar-actions">
+        <div class="notifications" aria-label="Notifications" id="notificationBell">
+          <i class="fa-solid fa-bell"></i>
+          <span class="badge" id="notificationCount">0</span>
+        </div>
+        <div class="notification-panel" id="notificationPanel">
+          <div class="notification-header">
+            <h3>Notifications</h3>
+            <button type="button" class="notification-clear-all" id="clearAllNotificationsBtn">Clear all</button>
+          </div>
+          <div id="notificationList" class="notification-list"></div>
+        </div>
+        <button class="logout" type="button" onclick="logout()">Sign Out</button>
+      </div>
+    </div>
+
+    <section class="hero-banner">
+      <div class="hero-copy">
+        <p class="hero-label">Brand Overview</p>
+        <h3>Shape Every Campaign with Clarity</h3>
+        <p>Stay on top of campaign updates, agency responses, and brand-facing decisions from one focused workspace.</p>
+      </div>
+    </section>
+
+    <section class="slideshow-section">
+      <div class="section-heading">
+        <div>
+          <p class="section-label">Highlights</p>
+          <h2>Nestl&eacute; Storyboard</h2>
+        </div>
+      </div>
+
+      <div class="slideshow">
+        <div class="slide active">
+          <img src="Images/brand_office.jpg" alt="Nestle brand office">
+          <div class="caption">Brand Collaboration Hub</div>
+        </div>
+
+        <div class="slide">
+          <img src="Images/brand_kitkat.jpg" alt="KitKat brand showcase">
+          <div class="caption">KitKat Moments</div>
+        </div>
+
+        <div class="slide">
+          <img src="Images/brand_maggie.jpg" alt="Maggi brand showcase">
+          <div class="caption">Maggi Brand Story</div>
+        </div>
+      </div>
+    </section>
+
+    <section class="agency-section" id="agency-section">
+      <div class="section-heading">
+        <div>
+          <p class="section-label">Agency Network</p>
+          <h2>Registered Agencies</h2>
+        </div>
+      </div>
+
+      <div class="agency-grid" id="agencyList"></div>
+
+      <div class="section-actions">
+        <button class="viewMore" style="display:none;">View More</button>
+      </div>
+    </section>
+
+    <footer>
+      Nestl&eacute; Digital Marketing Platform | System Version 1.0 | &copy; 2026 Nestl&eacute; Sri Lanka
+    </footer>
+  </main>
+</div>
+
+<script src="session_timeout.js"></script>
+<script src="BM_Dash.js"></script>
+</body>
+</html>

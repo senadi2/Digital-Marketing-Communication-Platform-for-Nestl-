@@ -1,29 +1,49 @@
 const bcrypt = require("bcrypt");
 const { getDb } = require("./firebase");
 
+const seedUsers = [
+    {
+        username: "manager@mmnestle.com",
+        password: "manager123",
+        role: "MarketingManager"
+    },
+    {
+        username: "brandmanager@bmnestle.com",
+        password: "brandmanager123",
+        role: "BrandManager"
+    }
+];
+
 async function seed() {
     const db = getDb();
-    const username = "manager@mmnestle.com";
-    const existingUserSnapshot = await db.collection("users").where("username", "==", username).limit(1).get();
+    let createdCount = 0;
 
-    if (!existingUserSnapshot.empty) {
-        console.log("Seed user already exists.");
-        return;
+    for (const user of seedUsers) {
+        const existingUserSnapshot = await db.collection("users").where("username", "==", user.username).limit(1).get();
+        if (!existingUserSnapshot.empty) {
+            console.log(`Seed user already exists: ${user.username}`);
+            continue;
+        }
+
+        const hashedPassword = await bcrypt.hash(user.password, 10);
+        const timestamp = new Date().toISOString();
+
+        await db.collection("users").add({
+            username: user.username,
+            password: hashedPassword,
+            role: user.role,
+            agencyId: null,
+            createdAt: timestamp,
+            updatedAt: timestamp
+        });
+
+        createdCount += 1;
+        console.log(`Seed user added: ${user.username}`);
     }
 
-    const hashedPassword = await bcrypt.hash("manager123", 10);
-    const timestamp = new Date().toISOString();
-
-    await db.collection("users").add({
-        username,
-        password: hashedPassword,
-        role: "MarketingManager",
-        agencyId: null,
-        createdAt: timestamp,
-        updatedAt: timestamp
-    });
-
-    console.log("Seed data added!");
+    if (!createdCount) {
+        console.log("No new seed users were added.");
+    }
 }
 
 seed().catch((err) => {

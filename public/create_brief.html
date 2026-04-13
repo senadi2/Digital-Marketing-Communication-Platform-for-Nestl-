@@ -7,6 +7,7 @@
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
 <link rel="icon" href="Images/faviconimg.png" type="image/png">
 <link rel="stylesheet" href="create_brief.css">
+<link rel="stylesheet" href="agency_chat.css">
 </head>
 <body>
   <main class="agency-page">
@@ -16,7 +17,13 @@
         <p class="eyebrow">Registered Agency</p>
         <h1 id="agencyName">Unnamed Agency</h1>
       </div>
-      <button class="primary-btn" type="button" id="openBriefModalBtn">Create New Campaign Brief</button>
+      <div class="page-header-actions">
+        <button type="button" class="agency-chat-trigger" id="agencyChatTrigger" aria-label="Open agency chat">
+          <i class="fa-solid fa-comments"></i>
+          <span>Chat</span>
+        </button>
+        <button class="primary-btn" type="button" id="openBriefModalBtn">Create New Campaign Brief</button>
+      </div>
     </header>
 
     <section class="agency-info-card">
@@ -69,6 +76,7 @@
   </div>
 
   <script src="session_timeout.js"></script>
+  <script src="agency_chat.js"></script>
   <script src="create_brief.js"></script>
 </body>
 </html>

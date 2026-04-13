@@ -5,9 +5,12 @@ const notificationList = document.getElementById("notificationList");
 const notificationCount = document.getElementById("notificationCount");
 const clearAllNotificationsBtn = document.getElementById("clearAllNotificationsBtn");
 const logoutBtn = document.querySelector(".logout");
+const agencyHeadline = document.getElementById("agencyHeadline");
 const DEFAULT_IMAGE = "/api/media/campaign-image?seed=campaign-default&title=Nestle%20Campaign";
 
 const agencyId = localStorage.getItem("agencyId") || "";
+const role = localStorage.getItem("role") || "";
+const userId = localStorage.getItem("userId") || "";
 
 if (!agencyId) {
     alert("Agency session not found. Please log in again.");
@@ -128,6 +131,20 @@ function renderNotifications(notes) {
     });
 }
 
+async function loadAgencyHeadline() {
+    if (!agencyId || !agencyHeadline) return;
+    try {
+        const res = await fetch(`/api/agencies/${encodeURIComponent(agencyId)}`);
+        const agency = await res.json();
+        if (!res.ok) throw new Error(agency.message || "Failed to load agency");
+
+        agencyHeadline.textContent = String(agency.name || "Agency");
+    } catch (err) {
+        console.error(err);
+        agencyHeadline.textContent = "Agency";
+    }
+}
+
 async function loadCampaigns() {
     if (!agencyId) return;
     try {
@@ -193,6 +210,16 @@ logoutBtn?.addEventListener("click", () => {
 });
 
 clearLegacyCampaignImageCache();
+loadAgencyHeadline();
 loadCampaigns();
 loadNotifications();
 setInterval(loadNotifications, 30000);
+
+if (window.initAgencyChat) {
+    window.initAgencyChat({
+        triggerId: "agencyChatTrigger",
+        agencyId,
+        userId,
+        role
+    });
+}

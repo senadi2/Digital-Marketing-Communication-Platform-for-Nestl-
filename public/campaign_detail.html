@@ -9,61 +9,156 @@
 </head>
 <body>
   <main class="detail-page">
-    <header class="detail-header">
-      <a href="AA_DASH.html" class="back-link">&larr; Back to Dashboard</a>
-      <h1 id="campaignTitle">Campaign Detail</h1>
-      <p id="campaignStatus" class="status-pill">Pending</p>
-    </header>
+    <header class="detail-hero">
+      <div class="hero-topbar">
+        <a href="AA_DASH.html" class="back-link" id="dashboardBackLink">&larr; Back</a>
+        <p class="viewer-label" id="viewerLabel">Campaign Workspace</p>
+      </div>
 
-    <section class="detail-card">
-      <div class="grid">
-        <div class="item">
-          <label>Target Audience</label>
-          <p id="targetAudience">-</p>
+      <div class="hero-main">
+        <div class="hero-copy">
+          <p class="hero-eyebrow" id="heroEyebrow">Campaign Workspace</p>
+          <h1 id="campaignTitle">Campaign Detail</h1>
+          <p id="campaignBudget" class="hero-budget">Budget: -</p>
+          <div class="hero-context">
+            <p class="meta-chip" id="campaignTimeline">Timeline unavailable</p>
+            <p class="meta-chip" id="campaignAudienceChip">Audience pending</p>
+          </div>
         </div>
-        <div class="item">
-          <label>Budget</label>
-          <p id="budgetRange">-</p>
-        </div>
-        <div class="item">
-          <label>Start Date</label>
-          <p id="startDate">-</p>
-        </div>
-        <div class="item">
-          <label>End Date</label>
-          <p id="endDate">-</p>
+        <div class="hero-summary">
+          <div class="hero-meta">
+            <p id="campaignStatus" class="status-pill">Pending</p>
+          </div>
         </div>
       </div>
-    </section>
+    </header>
 
-    <section class="detail-card">
-      <h2>Description</h2>
-      <p id="description">-</p>
-    </section>
+    <section class="detail-layout">
+      <div class="detail-main">
+        <section class="detail-card">
+          <div class="section-heading">
+            <div>
+              <p class="section-label">Brief Overview</p>
+              <h2>Description</h2>
+            </div>
+          </div>
+          <p id="description">-</p>
+        </section>
 
-    <section class="detail-card">
-      <h2>Objectives</h2>
-      <p id="objectives">-</p>
-    </section>
+        <section class="detail-card">
+          <div class="section-heading">
+            <div>
+              <p class="section-label">Expected Outcomes</p>
+              <h2>Objectives</h2>
+            </div>
+          </div>
+          <p id="objectives">-</p>
+        </section>
 
-    <section class="detail-card" id="rejectionReasonSection" hidden>
-      <h2>Rejection Reason</h2>
-      <p id="rejectionReasonText">-</p>
-    </section>
+        <section class="detail-card">
+          <div class="section-heading">
+            <div>
+              <p class="section-label">Supporting Material</p>
+              <h2>Attachments</h2>
+            </div>
+          </div>
+          <div id="attachmentList" class="attachment-list"></div>
+        </section>
+      </div>
 
-    <section class="detail-card">
-      <h2>Attachments</h2>
-      <div id="attachmentList" class="attachment-list"></div>
-    </section>
+      <aside class="detail-sidebar">
+        <section class="detail-card compact-card">
+          <div class="section-heading">
+            <div>
+              <p class="section-label">Campaign Snapshot</p>
+              <h2>Key Details</h2>
+            </div>
+          </div>
+          <div class="info-grid">
+            <div class="info-item">
+              <label>Target Audience</label>
+              <p id="targetAudience">-</p>
+            </div>
+            <div class="info-item">
+              <label>Status</label>
+              <p id="statusDetail">Pending</p>
+            </div>
+            <div class="info-item">
+              <label>Start Date</label>
+              <p id="startDate">-</p>
+            </div>
+            <div class="info-item">
+              <label>End Date</label>
+              <p id="endDate">-</p>
+            </div>
+          </div>
+        </section>
+      </aside>
 
-    <section class="detail-card" id="decisionCard" hidden>
-      <h2>Campaign Decision</h2>
-      <p class="decision-copy">Review the full brief before responding. If you decline, please tell the marketing manager why.</p>
-      <textarea id="rejectionReasonInput" rows="4" placeholder="Write the reason for rejecting this campaign"></textarea>
-      <p id="decisionMessage" class="decision-message" aria-live="polite"></p>
-      <div class="decision-actions">
-        <button type="button" class="secondary-btn" id="declineCampaignBtn">Decline Campaign</button>
-        <button type="button" class="primary-btn" id="acceptCampaignBtn">Accept Campaign</button>
+      <div class="detail-fullwidth">
+        <section class="detail-card">
+          <div class="section-heading creative-heading">
+            <div>
+              <p class="section-label">Creative Review</p>
+              <h2>Creative Uploads</h2>
+            </div>
+            <p class="creative-role-note" id="creativeRoleNote">Agency uploads creative here for review.</p>
+          </div>
+
+          <div class="creative-toolbar">
+            <button type="button" class="primary-btn" id="openCreativeModalBtn" hidden>Add New Creative</button>
+            <p id="creativeUploadHint" class="creative-upload-hint">Use Add New Creative to upload versions.</p>
+          </div>
+
+          <p id="creativeUploadMessage" class="decision-message" aria-live="polite"></p>
+          <div id="creativeList" class="creative-list"></div>
+
+          <div class="creative-upload-modal" id="creativeUploadModal" hidden>
+            <div class="creative-upload-dialog" role="dialog" aria-modal="true" aria-labelledby="creativeUploadModalTitle">
+              <div class="creative-upload-dialog-head">
+                <h3 id="creativeUploadModalTitle">Add New Creative</h3>
+                <button type="button" class="secondary-btn" id="closeCreativeModalBtn">Close</button>
+              </div>
+              <form id="creativeUploadForm" class="creative-upload-form">
+                <label class="upload-label" for="creativeUploadInput">Creative File</label>
+                <input id="creativeUploadInput" type="file" required>
+
+                <label class="upload-label" for="creativeDescriptionInput">Description</label>
+                <textarea id="creativeDescriptionInput" rows="3" placeholder="Describe this version" required></textarea>
+
+                <div class="upload-form-actions">
+                  <button type="submit" class="primary-btn" id="creativeUploadBtn">Upload Creative</button>
+                </div>
+              </form>
+            </div>
+          </div>
+        </section>
+
+        <section class="detail-card tone-alert" id="rejectionReasonSection" hidden>
+          <div class="section-heading">
+            <div>
+              <p class="section-label">Decision Context</p>
+              <h2>Rejection Reason</h2>
+            </div>
+          </div>
+          <p id="rejectionReasonText">-</p>
+        </section>
+
+        <section class="detail-card action-card" id="decisionCard" hidden>
+          <div class="section-heading">
+            <div>
+              <p class="section-label">Agency Response</p>
+              <h2>Campaign Decision</h2>
+            </div>
+          </div>
+          <p class="decision-copy">Review the full brief before responding. If you decline, include a clear reason so the marketing team can revise the brief quickly.</p>
+          <textarea id="rejectionReasonInput" rows="4" placeholder="Write the reason for rejecting this campaign"></textarea>
+          <p id="decisionMessage" class="decision-message" aria-live="polite"></p>
+          <div class="decision-actions">
+            <button type="button" class="secondary-btn" id="declineCampaignBtn">Decline Campaign</button>
+            <button type="button" class="primary-btn" id="acceptCampaignBtn">Accept Campaign</button>
+          </div>
+        </section>
       </div>
     </section>
   </main>

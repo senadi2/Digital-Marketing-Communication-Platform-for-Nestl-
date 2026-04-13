@@ -7,6 +7,7 @@
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
 <link rel="icon" href="Images/faviconimg.png" type="image/png">
 <link rel="stylesheet" href="AA_DASH.css">
+<link rel="stylesheet" href="agency_chat.css">
 </head>
 
 <body>
@@ -24,6 +25,13 @@
     <ul class="nav">
       <li class="active"><i class="fa-solid fa-house"></i><span>Home</span></li>
     </ul>
+
+    <div class="sidebar-chat-launch">
+      <button type="button" class="sidebar-chat-btn" id="agencyChatTrigger" aria-label="Open agency chat">
+        <i class="fa-solid fa-comments"></i>
+        <span>Agency Chat</span>
+      </button>
+    </div>
   </aside>
 
   <main class="main">
@@ -51,7 +59,7 @@
     <section class="hero-banner">
       <div class="hero-copy">
         <p class="hero-label">Welcome back</p>
-        <h3>Stay Aligned. Stay Ahead.</h3>
+        <h3 id="agencyHeadline">Agency</h3>
         <p>Collaborate with Nestlé teams, deliver exceptional work, and keep every project moving forward.</p>
       </div>
 
@@ -76,6 +84,7 @@
 </div>
 
 <script src="session_timeout.js"></script>
+<script src="agency_chat.js"></script>
 <script src="AA_DASH.js"></script>
 </body>
 </html>

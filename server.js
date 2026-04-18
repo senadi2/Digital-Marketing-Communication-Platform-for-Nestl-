@@ -12,12 +12,10 @@ const LOGIN_AUDITS_COLLECTION = "loginAudits";
 const AGENCY_CHAT_COLLECTION = "agencyChats";
 
 const app = express();
-const PORT = Number(process.env.PORT) || 3000;
 
 app.use(cors());
 app.use(express.json({ limit: "30mb" }));
 app.use(express.static(path.join(__dirname, "public")));
-app.set("trust proxy", 1);
 
 let db = null;
 let dbInitializationError = null;
@@ -1197,8 +1195,8 @@ app.patch("/api/notifications/read-all", async (req, res) => {
     }
 });
 
-app.listen(PORT, () => {
-    console.log(`Server running on http://localhost:${PORT}`);
+app.listen(3000, () => {
+    console.log("Server running on http://localhost:3000");
 });
 
 

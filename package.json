@@ -2,7 +2,7 @@
   "name": "nestle-platform-draft",
   "version": "1.0.0",
   "description": "",
-  "main": "AA_DASH.js",
+  "main": "server.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
     "start": "node server.js"

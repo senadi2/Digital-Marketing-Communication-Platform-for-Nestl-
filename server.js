@@ -640,8 +640,16 @@ function buildCreativeCommentNotificationMessage(authorRole, campaignTitle, crea
 }
 
 app.get("/", (req, res) => {
-    res.send("API is working");
+    res.sendFile(path.join(__dirname, "public", "LOGIN.html"));
 });
+
+app.use((req, res, next) => {
+    if (req.path.startsWith("/api/")) {
+        return next();
+    }
+    res.sendFile(path.join(__dirname, "public", "LOGIN.html"));
+});
+
 
 app.get("/api/media/agency-image", (req, res) => {
     const seed = req.query.seed || Date.now();

@@ -1,5 +1,7 @@
+const productList = document.getElementById("productList");
 const agencyList = document.getElementById("agencyList");
 const viewMoreBtn = document.querySelector(".viewMore");
+const viewMoreProductsBtn = document.querySelector(".viewMoreProducts");
 const notificationBell = document.getElementById("notificationBell");
 const notificationPanel = document.getElementById("notificationPanel");
 const notificationList = document.getElementById("notificationList");
@@ -7,10 +9,14 @@ const notificationCount = document.getElementById("notificationCount");
 const clearAllNotificationsBtn = document.getElementById("clearAllNotificationsBtn");
 
 const DEFAULT_IMAGE = "/api/media/agency-image?seed=default&name=Agency";
+const DEFAULT_PRODUCT_IMAGE = "Images/logo_nobackground.png";
 const brandManagerUserId = localStorage.getItem("userId") || "";
+let allProducts = [];
 let allAgencies = [];
 let currentIndex = 0;
+let currentProductIndex = 0;
 const agenciesPerPage = 3;
+const productsPerPage = 3;
 const slides = document.querySelectorAll(".slide");
 
 function formatDate(isoDate) {
@@ -29,6 +35,35 @@ function escapeHtml(value) {
 
 function getUniqueFallbackImage(seedValue) {
     return `/api/media/agency-image?seed=${encodeURIComponent(seedValue)}&name=${encodeURIComponent("Agency Partner")}`;
+}
+
+function productLogoBase(productName) {
+    const normalized = String(productName || "nestle")
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "")
+        .toLowerCase()
+        .replace(/^nestle\s+/, "")
+        .replace(/[^a-z0-9]/g, "");
+    const aliases = {
+        milkmaid: "milkmade"
+    };
+    return aliases[normalized] || normalized || "nestle";
+}
+
+function productImage(product) {
+    return `Images/${productLogoBase(product.name)}_logoP.png`;
+}
+
+function useNextProductImage(event, productName) {
+    const img = event.currentTarget;
+    const attempts = Number(img.dataset.logoAttempt || 0);
+    const extensions = ["webp", "jpg", "jpeg"];
+    if (attempts < extensions.length) {
+        img.dataset.logoAttempt = String(attempts + 1);
+        img.src = `Images/${productLogoBase(productName)}_logoP.${extensions[attempts]}`;
+        return;
+    }
+    img.src = DEFAULT_PRODUCT_IMAGE;
 }
 
 function hydrateAgencyImages(agencies) {
@@ -65,6 +100,48 @@ function createAgencyCard(agency) {
     });
 
     agencyList.appendChild(card);
+}
+
+function createProductCard(product) {
+    const card = document.createElement("div");
+    card.className = "agency-card";
+    card.innerHTML = `
+        <img src="${escapeHtml(productImage(product) || DEFAULT_PRODUCT_IMAGE)}" alt="${escapeHtml(product.name || "Product")}">
+        <h3>${escapeHtml(product.name || "Unnamed Product")}</h3>
+        <p class="card-meta">${escapeHtml(product.category || "Product")} | ${Number(product.campaignCount || 0)} campaign(s)</p>
+    `;
+    card.querySelector("img").addEventListener("error", (event) => useNextProductImage(event, product.name));
+    card.addEventListener("click", () => {
+        window.location.href = `create_brief.html?productId=${encodeURIComponent(product._id)}`;
+    });
+    productList.appendChild(card);
+}
+
+async function showMoreProducts() {
+    const nextIndex = currentProductIndex + productsPerPage;
+    for (let i = currentProductIndex; i < nextIndex && i < allProducts.length; i++) {
+        createProductCard(allProducts[i]);
+    }
+
+    currentProductIndex = nextIndex;
+    if (viewMoreProductsBtn) {
+        viewMoreProductsBtn.style.display = currentProductIndex < allProducts.length ? "block" : "none";
+    }
+}
+
+async function loadProducts() {
+    if (!productList) return;
+
+    try {
+        const res = await fetch("/api/products");
+        const products = await res.json();
+        allProducts = Array.isArray(products) ? products : [];
+        productList.innerHTML = "";
+        currentProductIndex = 0;
+        await showMoreProducts();
+    } catch (err) {
+        console.error(err);
+    }
 }
 
 async function showMoreAgencies() {
@@ -181,6 +258,7 @@ clearAllNotificationsBtn?.addEventListener("click", () => {
 });
 
 viewMoreBtn?.addEventListener("click", showMoreAgencies);
+viewMoreProductsBtn?.addEventListener("click", showMoreProducts);
 
 let index = 0;
 function showSlides() {
@@ -201,6 +279,7 @@ document.addEventListener("click", (event) => {
     }
 });
 
+loadProducts();
 loadAgencies();
 loadNotifications();
 setInterval(loadNotifications, 30000);

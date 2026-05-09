@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>KOALA by Nestle | Campaign Review</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+<link rel="icon" href="Images/faviconimg.png" type="image/png">
+<link rel="stylesheet" href="MM_DASH.CSS">
+<link rel="stylesheet" href="campaign_progress_overview.css">
+</head>
+
+<body>
+<div class="container">
+  <aside class="sidebar">
+    <div class="logo">
+      <img src="Images/logo_nobackground.png" alt="Nestle platform logo">
+    </div>
+
+    <div class="sidebar-copy">
+      <h2>Total Visibility. Better Decisions. Faster Results.</h2>
+      <p class="sidebar-text">Track review decisions and creative status across brand campaigns.</p>
+    </div>
+
+    <ul class="nav">
+      <li><i class="fa-solid fa-box-open"></i><a href="BM_dash.html#product-section"><span>Products</span></a></li>
+      <li><i class="fa-solid fa-building-user"></i><a href="BM_dash.html#agency-section"><span>Agencies</span></a></li>
+      <li class="active"><i class="fa-solid fa-clipboard-check"></i><a href="brand_campaign_review.html"><span>Campaign Review</span></a></li>
+    </ul>
+  </aside>
+
+  <main class="main overview-main">
+    <div class="topbar">
+      <div class="topbar-meta">
+        <img src="Images/logo.svg" alt="Nestle logo">
+      </div>
+
+      <div class="topbar-actions">
+        <button class="logout" type="button" onclick="logout()">Sign Out</button>
+      </div>
+    </div>
+
+    <section class="overview-header">
+      <div>
+        <p class="section-label">Brand Review Progress</p>
+        <h1>Creative Review Status</h1>
+      </div>
+      <p id="updatedAt">Loading...</p>
+    </section>
+
+    <section class="overview-stats" id="summaryStats" aria-label="Review summary"></section>
+
+    <section class="overview-grid">
+      <article class="overview-panel pipeline-panel">
+        <div class="panel-heading">
+          <div>
+            <p class="section-label">Review Queue</p>
+            <h2>Status Breakdown</h2>
+          </div>
+        </div>
+        <div class="status-bars" id="statusBars"></div>
+      </article>
+
+      <article class="overview-panel action-panel">
+        <div class="panel-heading">
+          <div>
+            <p class="section-label">Brand Attention</p>
+            <h2>Needs Review</h2>
+          </div>
+        </div>
+        <div class="action-list" id="actionList"></div>
+      </article>
+    </section>
+
+    <section class="overview-panel campaign-panel">
+      <div class="panel-heading campaign-panel-heading">
+        <div>
+          <p class="section-label">Review Register</p>
+          <h2>Campaign Review Summary</h2>
+        </div>
+        <div class="filter-group" aria-label="Filter campaigns">
+          <button type="button" class="filter-btn active" data-filter="All">All</button>
+          <button type="button" class="filter-btn" data-filter="Awaiting Review">Awaiting Review</button>
+          <button type="button" class="filter-btn" data-filter="Changes Requested">Changes Requested</button>
+          <button type="button" class="filter-btn" data-filter="Approved">Approved</button>
+          <button type="button" class="filter-btn" data-filter="No Creative">No Creative</button>
+        </div>
+      </div>
+
+      <div class="campaign-table-wrap">
+        <table class="campaign-table">
+          <thead>
+            <tr>
+              <th>Campaign</th>
+              <th>Product</th>
+              <th>Agency</th>
+              <th>Review Status</th>
+              <th>Creative Review</th>
+              <th>Latest Upload</th>
+            </tr>
+          </thead>
+          <tbody id="campaignTableBody"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <footer>
+      Nestle Digital Marketing Platform | System Version 1.0 | &copy; 2026 Nestle Sri Lanka
+    </footer>
+  </main>
+</div>
+
+<script src="session_timeout.js"></script>
+<script src="brand_campaign_review.js"></script>
+</body>
+</html>

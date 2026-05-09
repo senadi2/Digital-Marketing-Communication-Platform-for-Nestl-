@@ -1,6 +1,7 @@
 const params = new URLSearchParams(window.location.search);
 const campaignId = params.get("campaignId");
 const viewerAgencyId = params.get("agencyId");
+const viewerProductId = params.get("productId");
 
 const dashboardBackLink = document.getElementById("dashboardBackLink");
 const viewerLabel = document.getElementById("viewerLabel");
@@ -12,18 +13,19 @@ const statusDetailEl = document.getElementById("statusDetail");
 const campaignTimelineEl = document.getElementById("campaignTimeline");
 const campaignAudienceChipEl = document.getElementById("campaignAudienceChip");
 const targetAudienceEl = document.getElementById("targetAudience");
-const startDateEl = document.getElementById("startDate");
-const endDateEl = document.getElementById("endDate");
+const campaignTypeEl = document.getElementById("campaignType");
 const descriptionEl = document.getElementById("description");
 const objectivesEl = document.getElementById("objectives");
 const attachmentList = document.getElementById("attachmentList");
 const creativeRoleNote = document.getElementById("creativeRoleNote");
 const creativeUploadForm = document.getElementById("creativeUploadForm");
+const creativeUploadModalTitle = document.getElementById("creativeUploadModalTitle");
 const creativeUploadInput = document.getElementById("creativeUploadInput");
 const creativeUploadBtn = document.getElementById("creativeUploadBtn");
 const creativeUploadHint = document.getElementById("creativeUploadHint");
 const creativeUploadMessage = document.getElementById("creativeUploadMessage");
 const creativeList = document.getElementById("creativeList");
+const approvedVariantPanel = document.getElementById("approvedVariantPanel");
 const openCreativeModalBtn = document.getElementById("openCreativeModalBtn");
 const creativeUploadModal = document.getElementById("creativeUploadModal");
 const closeCreativeModalBtn = document.getElementById("closeCreativeModalBtn");
@@ -41,6 +43,32 @@ const role = localStorage.getItem("role") || "";
 const userId = localStorage.getItem("userId") || "";
 
 let currentCampaign = null;
+let activeVideoUrls = [];
+
+const POST_CREATIVE_VARIANTS = [
+    { channel: "Instagram Feed", width: 1080, height: 1080, aspectRatio: "1:1", format: "PNG" },
+    { channel: "Instagram Story", width: 1080, height: 1920, aspectRatio: "9:16", format: "PNG" },
+    { channel: "Facebook Feed", width: 1080, height: 1080, aspectRatio: "1:1", format: "PNG" },
+    { channel: "Google Ads Landscape", width: 1200, height: 628, aspectRatio: "1.91:1", format: "PNG" },
+    { channel: "Google Ads Square", width: 1200, height: 1200, aspectRatio: "1:1", format: "PNG" },
+    { channel: "LinkedIn Feed Landscape", width: 1200, height: 628, aspectRatio: "1.91:1", format: "PNG" },
+    { channel: "LinkedIn Feed Square", width: 1200, height: 1200, aspectRatio: "1:1", format: "PNG" }
+];
+
+const VIDEO_CREATIVE_VARIANTS = [
+    { channel: "Instagram Reels", width: 1080, height: 1920, aspectRatio: "9:16", format: "MP4/MOV" },
+    { channel: "Instagram Story", width: 1080, height: 1920, aspectRatio: "9:16", format: "MP4/MOV" },
+    { channel: "YouTube Landscape", width: 1920, height: 1080, aspectRatio: "16:9", format: "MP4/MOV" },
+    { channel: "Facebook Video Feed", width: 1080, height: 1080, aspectRatio: "1:1", format: "MP4/MOV" },
+    { channel: "TikTok Vertical", width: 1080, height: 1920, aspectRatio: "9:16", format: "MP4/MOV" }
+];
+
+function normalizeVariantChannel(channel) {
+    const value = String(channel || "");
+    if (value === "Google Display Landscape") return "Google Ads Landscape";
+    if (value === "Google Display Square") return "Google Ads Square";
+    return value;
+}
 
 function escapeHtml(value) {
     return String(value || "")
@@ -125,6 +153,13 @@ function creativeStatusClass(status) {
     return "pending-review";
 }
 
+function creativeRowStatusClass(status) {
+    const normalized = normalizeCreativeStatus(status);
+    if (normalized === "Approved") return "creative-row-approved";
+    if (normalized === "Changes Requested") return "creative-row-changes-requested";
+    return "";
+}
+
 function formatDate(dateString) {
     if (!dateString) return "-";
     const date = new Date(dateString);
@@ -158,6 +193,32 @@ function formatDateRange(startDate, endDate) {
     return `${start} to ${end}`;
 }
 
+function isVideoCampaign(campaign = currentCampaign) {
+    return String(campaign?.campaignType || "").trim().toLowerCase() === "video";
+}
+
+function formatTimestamp(seconds) {
+    const total = Math.max(0, Math.floor(Number(seconds) || 0));
+    const hrs = Math.floor(total / 3600);
+    const mins = Math.floor((total % 3600) / 60);
+    const secs = total % 60;
+    if (hrs) {
+        return `${hrs}:${String(mins).padStart(2, "0")}:${String(secs).padStart(2, "0")}`;
+    }
+    return `${mins}:${String(secs).padStart(2, "0")}`;
+}
+
+function parseTimestamp(value) {
+    const text = String(value || "").trim();
+    if (!text) return null;
+    const parts = text.split(":").map((part) => Number(part));
+    if (parts.some((part) => !Number.isFinite(part) || part < 0)) return null;
+    if (parts.length === 1) return Math.floor(parts[0]);
+    if (parts.length === 2) return Math.floor((parts[0] * 60) + parts[1]);
+    if (parts.length === 3) return Math.floor((parts[0] * 3600) + (parts[1] * 60) + parts[2]);
+    return null;
+}
+
 function setBackLink() {
     if (role === "BrandManager") {
         dashboardBackLink.href = viewerAgencyId
@@ -170,10 +231,12 @@ function setBackLink() {
     }
 
     if (role === "MarketingManager") {
-        dashboardBackLink.href = viewerAgencyId
+        dashboardBackLink.href = viewerProductId
+            ? `create_brief.html?productId=${encodeURIComponent(viewerProductId)}`
+            : viewerAgencyId
             ? `create_brief.html?agencyId=${encodeURIComponent(viewerAgencyId)}`
             : "MM_dash.html";
-        dashboardBackLink.textContent = viewerAgencyId ? "\u2190 Back to Agency Campaigns" : "\u2190 Back to Dashboard";
+        dashboardBackLink.textContent = viewerProductId ? "\u2190 Back to Product Campaigns" : viewerAgencyId ? "\u2190 Back to Agency Campaigns" : "\u2190 Back to Dashboard";
         viewerLabel.textContent = "";
         heroEyebrow.textContent = "Marketing Campaign Workspace";
         return;
@@ -207,6 +270,16 @@ function toggleCreativeUploadControls(disabled) {
 }
 
 function downloadAttachment(file) {
+    if (file.fileUrl) {
+        const anchor = document.createElement("a");
+        anchor.href = file.fileUrl;
+        anchor.download = file.fileName || "attachment";
+        document.body.appendChild(anchor);
+        anchor.click();
+        anchor.remove();
+        return;
+    }
+
     const blob = new Blob(
         [Uint8Array.from(atob(file.dataBase64 || ""), (char) => char.charCodeAt(0))],
         { type: file.mimeType || "application/octet-stream" }
@@ -219,6 +292,143 @@ function downloadAttachment(file) {
     anchor.click();
     anchor.remove();
     URL.revokeObjectURL(url);
+}
+
+function safeFilePart(value) {
+    return String(value || "creative")
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "")
+        .replace(/[^a-z0-9]+/gi, "-")
+        .replace(/^-+|-+$/g, "")
+        .toLowerCase() || "creative";
+}
+
+function getVariantSourceUrl(variant, creative) {
+    return variant?.sourceFileUrl || creative?.fileUrl || "";
+}
+
+function downloadVariantFile(variant, fallbackCreative) {
+    if (variant?.fileUrl) {
+        const channel = normalizeVariantChannel(variant.channel);
+        downloadAttachment({
+            fileUrl: variant.fileUrl,
+            fileName: variant.fileName || `${safeFilePart(channel)}-${variant.width}x${variant.height}.mp4`,
+            mimeType: fallbackCreative?.mimeType || "application/octet-stream"
+        });
+        return;
+    }
+    downloadAttachment(fallbackCreative);
+}
+
+function isImageCreative(creative) {
+    return String(creative?.mimeType || "").toLowerCase().startsWith("image/");
+}
+
+function getApprovedCreative(creativeAssets) {
+    return (Array.isArray(creativeAssets) ? creativeAssets : [])
+        .find((asset) => normalizeCreativeStatus(asset?.reviewStatus) === "Approved") || null;
+}
+
+function buildFallbackVariants(creative) {
+    const base = isVideoCampaign() ? VIDEO_CREATIVE_VARIANTS : POST_CREATIVE_VARIANTS;
+    const variantType = isVideoCampaign() ? "video-spec" : "image";
+    return base.map((variant, index) => ({
+        ...variant,
+        channel: normalizeVariantChannel(variant.channel),
+        id: `${creative?.id || "approved"}-${index}`,
+        status: "Ready",
+        variantType,
+        sourceCreativeId: creative?.id || "",
+        sourceFileName: creative?.fileName || "",
+        sourceFileUrl: creative?.fileUrl || "",
+        sourceMimeType: creative?.mimeType || "",
+        generatedAt: creative?.reviewedAt || creative?.uploadedAt || ""
+    }));
+}
+
+function imageToCanvasBlob(imageUrl, variant, mimeType = "image/png") {
+    return new Promise((resolve, reject) => {
+        const image = new Image();
+        image.crossOrigin = "anonymous";
+        image.onload = () => {
+            const canvas = document.createElement("canvas");
+            canvas.width = Number(variant.width || 0);
+            canvas.height = Number(variant.height || 0);
+            const ctx = canvas.getContext("2d");
+            if (!ctx || !canvas.width || !canvas.height) {
+                reject(new Error("Variant size is unavailable."));
+                return;
+            }
+
+            ctx.fillStyle = "#000000";
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            const scale = Math.min(canvas.width / image.naturalWidth, canvas.height / image.naturalHeight);
+            const drawWidth = image.naturalWidth * scale;
+            const drawHeight = image.naturalHeight * scale;
+            const drawX = (canvas.width - drawWidth) / 2;
+            const drawY = (canvas.height - drawHeight) / 2;
+            ctx.drawImage(image, drawX, drawY, drawWidth, drawHeight);
+
+            canvas.toBlob((blob) => {
+                if (!blob) {
+                    reject(new Error("Could not generate variant."));
+                    return;
+                }
+                resolve(blob);
+            }, mimeType);
+        };
+        image.onerror = () => reject(new Error("Could not load approved creative for variant generation."));
+        image.src = imageUrl;
+    });
+}
+
+async function downloadImageVariant(variant, creative, button) {
+    const imageUrl = getVariantSourceUrl(variant, creative);
+    if (!imageUrl) return;
+
+    const previousText = button?.textContent || "Download";
+    try {
+        if (button) {
+            button.disabled = true;
+            button.textContent = "Preparing...";
+        }
+        const blob = await imageToCanvasBlob(imageUrl, variant);
+        const url = URL.createObjectURL(blob);
+        const anchor = document.createElement("a");
+        anchor.href = url;
+        anchor.download = `${safeFilePart(creative?.fileName)}-${safeFilePart(normalizeVariantChannel(variant.channel))}-${variant.width}x${variant.height}.png`;
+        document.body.appendChild(anchor);
+        anchor.click();
+        anchor.remove();
+        URL.revokeObjectURL(url);
+    } catch (err) {
+        alert(err.message || "Could not download this variant.");
+    } finally {
+        if (button) {
+            button.disabled = false;
+            button.textContent = previousText;
+        }
+    }
+}
+
+function createFileObjectUrl(file) {
+    if (file.fileUrl) {
+        return file.fileUrl;
+    }
+
+    const blob = new Blob(
+        [Uint8Array.from(atob(file.dataBase64 || ""), (char) => char.charCodeAt(0))],
+        { type: file.mimeType || "application/octet-stream" }
+    );
+    const url = URL.createObjectURL(blob);
+    activeVideoUrls.push(url);
+    return url;
+}
+
+function revokeActiveVideoUrls() {
+    activeVideoUrls.forEach((url) => URL.revokeObjectURL(url));
+    activeVideoUrls = [];
 }
 
 function fileToBase64(file) {
@@ -248,6 +458,14 @@ async function prepareCreativeFiles() {
     const maxBytes = 20 * 1024 * 1024;
     if (file.size > maxBytes) {
         throw new Error("Creative upload size must be 20MB or less.");
+    }
+
+    const uploadingVideo = isVideoCampaign();
+    if (uploadingVideo && !String(file.type || "").toLowerCase().startsWith("video/")) {
+        throw new Error("Choose a video file for this video campaign.");
+    }
+    if (!uploadingVideo && String(file.type || "").toLowerCase().startsWith("video/")) {
+        throw new Error("Choose a non-video file for this post campaign.");
     }
 
     const version = getNextCreativeVersion(currentCampaign?.creativeAssets || []);
@@ -317,6 +535,9 @@ function buildCommentHtml(comment) {
                 <strong>${escapeHtml(authorLabel)}</strong>
                 <span>${escapeHtml(formatDateTime(comment.createdAt))}</span>
             </div>
+            ${comment.timestampSeconds !== null && comment.timestampSeconds !== undefined ? `
+                <button type="button" class="timestamp-chip" data-timestamp="${escapeHtml(comment.timestampSeconds)}">${escapeHtml(formatTimestamp(comment.timestampSeconds))}</button>
+            ` : ""}
             <p>${escapeHtml(comment.message)}</p>
         </div>
     `;
@@ -378,6 +599,13 @@ function getNextCreativeVersion(creativeAssets) {
 
 function openCreativeModal() {
     if (!creativeUploadModal) return;
+    const videoCampaign = isVideoCampaign();
+    if (creativeUploadModalTitle) {
+        creativeUploadModalTitle.textContent = videoCampaign ? "Upload Video Creative" : "Add New Creative";
+    }
+    if (creativeUploadInput) {
+        creativeUploadInput.accept = videoCampaign ? "video/*" : "image/*,.pdf,.doc,.docx,.ppt,.pptx";
+    }
     creativeUploadModal.hidden = false;
 }
 
@@ -387,8 +615,264 @@ function closeCreativeModal() {
     creativeUploadForm?.reset();
 }
 
+function renderVideoCreatives(creativeAssets, options) {
+    revokeActiveVideoUrls();
+    const list = Array.isArray(creativeAssets) ? creativeAssets : [];
+    const sortedVideos = list
+        .slice()
+        .sort((a, b) => {
+            const aVersion = Number(a?.version || 0);
+            const bVersion = Number(b?.version || 0);
+            if (aVersion !== bVersion) return bVersion - aVersion;
+            return toTimestamp(b?.uploadedAt) - toTimestamp(a?.uploadedAt);
+        });
+
+    if (!sortedVideos.length) {
+        creativeList.innerHTML = `<p class="empty-text">No video creative has been uploaded yet.</p>`;
+        return;
+    }
+
+    const latestVideo = sortedVideos[0];
+    const normalizedReviewStatus = normalizeCreativeStatus(latestVideo.reviewStatus);
+    const comments = Array.isArray(latestVideo.comments) ? latestVideo.comments : [];
+    const canComment = options.canManagerComment || options.canAgencyReply;
+    const videoUrl = createFileObjectUrl(latestVideo);
+    const feedbackHtml = comments.length
+        ? `<div class="feedback-thread">${comments.map(buildCommentHtml).join("")}</div>`
+        : `<p class="empty-text">No video feedback yet.</p>`;
+    const historyHtml = sortedVideos.length > 1
+        ? sortedVideos.slice(1).map((asset) => {
+            const status = normalizeCreativeStatus(asset.reviewStatus);
+            return `
+                <div class="video-history-item" data-history-video-id="${escapeHtml(asset.id)}">
+                    <div>
+                        <strong>V${escapeHtml(asset.version || 1)}</strong>
+                        <span>${escapeHtml(asset.fileName || "Video creative")}</span>
+                        <small>${escapeHtml(formatDateTime(asset.uploadedAt))} | ${escapeHtml(status)}</small>
+                    </div>
+                    <div class="video-history-actions">
+                        <button type="button" class="secondary-btn video-history-play-btn">Play</button>
+                        <button type="button" class="secondary-btn video-history-download-btn">Download</button>
+                    </div>
+                </div>
+            `;
+        }).join("")
+        : `<p class="empty-text">No older video versions yet.</p>`;
+
+    creativeList.innerHTML = `
+        <div class="video-review-panel" data-creative-id="${escapeHtml(latestVideo.id)}">
+            <div class="video-player-wrap">
+                <video class="creative-video-player" controls src="${escapeHtml(videoUrl)}"></video>
+            </div>
+            <div class="video-review-side">
+                <div class="video-review-head">
+                    <div>
+                        <p class="section-label">Latest Video</p>
+                        <h3>${escapeHtml(latestVideo.fileName || "Video creative")}</h3>
+                        <p class="attachment-size">${escapeHtml(formatBytes(latestVideo.size))} | Uploaded ${escapeHtml(formatDateTime(latestVideo.uploadedAt))}</p>
+                    </div>
+                    <span class="creative-status ${escapeHtml(creativeStatusClass(normalizedReviewStatus))}">${escapeHtml(normalizedReviewStatus)}</span>
+                </div>
+                <p>${escapeHtml(latestVideo.description || "-")}</p>
+                <div class="video-action-row">
+                    <button type="button" class="secondary-btn video-latest-play-btn">Play</button>
+                    <button type="button" class="secondary-btn creative-download-btn">Download Video</button>
+                    ${options.isBrandManager && normalizedReviewStatus === "Pending Review" ? `
+                        <button type="button" class="secondary-btn creative-review-btn" data-decision="Changes Requested">Request Changes</button>
+                        <button type="button" class="primary-btn creative-review-btn" data-decision="Approved">Approve</button>
+                    ` : ""}
+                </div>
+                ${options.isBrandManager && normalizedReviewStatus === "Pending Review" ? `
+                    <p class="creative-inline-message review-message" aria-live="polite"></p>
+                ` : ""}
+            </div>
+            <div class="video-history-panel">
+                <div class="comment-thread-header">
+                    <h3>Version History</h3>
+                </div>
+                <div class="video-history-list">
+                    ${historyHtml}
+                </div>
+            </div>
+            <div class="video-feedback-panel">
+                <div class="comment-thread-header">
+                    <h3>Video Feedback</h3>
+                </div>
+                <div class="video-feedback-thread">
+                    ${feedbackHtml}
+                </div>
+                ${canComment ? `
+                    <form class="comment-form video-comment-form">
+                        <div class="timestamp-control">
+                            <label for="videoTimestampInput">Timestamp</label>
+                            <div>
+                                <input id="videoTimestampInput" class="timestamp-input" type="text" placeholder="0:15 or leave blank">
+                                <button type="button" class="secondary-btn use-current-time-btn">Use Current Time</button>
+                            </div>
+                        </div>
+                        <textarea class="comment-input" rows="3" placeholder="${options.canManagerComment ? "Leave feedback for the agency" : "Reply to feedback"}"></textarea>
+                        <div class="comment-form-actions">
+                            <button type="submit" class="primary-btn comment-submit-btn">${options.canManagerComment ? "Post Comment" : "Reply"}</button>
+                        </div>
+                        <p class="creative-inline-message comment-message" aria-live="polite"></p>
+                    </form>
+                ` : ""}
+            </div>
+        </div>
+    `;
+
+    const panel = creativeList.querySelector(".video-review-panel");
+    const videoEl = panel?.querySelector(".creative-video-player");
+    panel?.querySelector(".video-latest-play-btn")?.addEventListener("click", () => {
+        if (!videoEl) return;
+        videoEl.src = createFileObjectUrl(latestVideo);
+        videoEl.load();
+        videoEl.play().catch(() => {});
+    });
+    panel?.querySelector(".creative-download-btn")?.addEventListener("click", () => downloadAttachment(latestVideo));
+    panel?.querySelectorAll(".video-history-item").forEach((item) => {
+        const historyVideoId = item.getAttribute("data-history-video-id") || "";
+        const historyVideo = sortedVideos.find((entry) => entry.id === historyVideoId);
+        if (!historyVideo) return;
+
+        item.querySelector(".video-history-play-btn")?.addEventListener("click", () => {
+            if (!videoEl) return;
+            videoEl.src = createFileObjectUrl(historyVideo);
+            videoEl.load();
+            videoEl.play().catch(() => {});
+        });
+
+        item.querySelector(".video-history-download-btn")?.addEventListener("click", () => downloadAttachment(historyVideo));
+    });
+    panel?.querySelectorAll(".timestamp-chip").forEach((button) => {
+        button.addEventListener("click", () => {
+            if (!videoEl) return;
+            videoEl.currentTime = Number(button.dataset.timestamp || 0);
+            videoEl.play().catch(() => {});
+        });
+    });
+    panel?.querySelector(".use-current-time-btn")?.addEventListener("click", () => {
+        const input = panel.querySelector(".timestamp-input");
+        if (input && videoEl) input.value = formatTimestamp(videoEl.currentTime);
+    });
+    if (options.isBrandManager) {
+        const reviewMessage = panel?.querySelector(".review-message");
+        panel?.querySelectorAll(".creative-review-btn").forEach((button) => {
+            button.addEventListener("click", async () => {
+                await submitCreativeReview(latestVideo.id, button.dataset.decision, "", reviewMessage, panel);
+            });
+        });
+    }
+    const commentForm = panel?.querySelector(".comment-form");
+    if (commentForm) {
+        commentForm.addEventListener("submit", async (event) => {
+            event.preventDefault();
+            const commentInput = commentForm.querySelector(".comment-input");
+            const timestampInput = commentForm.querySelector(".timestamp-input");
+            const commentMessage = commentForm.querySelector(".comment-message");
+            await submitCreativeComment(
+                latestVideo.id,
+                commentInput?.value || "",
+                commentMessage,
+                commentInput,
+                parseTimestamp(timestampInput?.value)
+            );
+            if (timestampInput) timestampInput.value = "";
+        });
+    }
+}
+
+function renderApprovedVariants(creativeAssets) {
+    if (!approvedVariantPanel) return;
+    const approvedCreative = getApprovedCreative(creativeAssets);
+    if (!approvedCreative) {
+        approvedVariantPanel.innerHTML = "";
+        return;
+    }
+
+    const isVideo = isVideoCampaign();
+    const isImage = isImageCreative(approvedCreative);
+    const supportsChannelVariants = isVideo || isImage;
+    const variants = supportsChannelVariants && Array.isArray(approvedCreative.variants) && approvedCreative.variants.length
+        ? approvedCreative.variants.map((variant) => ({
+            ...variant,
+            channel: normalizeVariantChannel(variant.channel)
+        }))
+        : supportsChannelVariants
+            ? buildFallbackVariants(approvedCreative)
+            : [];
+    const sourceUrl = approvedCreative.fileUrl || "";
+    const canGenerateImages = !isVideo && isImage && sourceUrl;
+
+    approvedVariantPanel.innerHTML = `
+        <section class="approved-variants-card">
+            <div class="section-heading variant-heading">
+                <div>
+                    <p class="section-label">Media Handoff</p>
+                    <h2>${supportsChannelVariants ? "Approved Creative Variants" : "Approved Creative"}</h2>
+                </div>
+                <div class="variant-summary-wrap">
+                    <p class="variant-summary">${escapeHtml(approvedCreative.fileName || "Approved creative")}${supportsChannelVariants ? ` | ${escapeHtml(variants.length)} channel format(s)` : ""}</p>
+                    ${!canGenerateImages ? `<button type="button" class="primary-btn variant-source-download-btn">Download Approved Source</button>` : ""}
+                </div>
+            </div>
+            ${supportsChannelVariants ? `
+                <div class="variant-grid">
+                    ${variants.map((variant) => {
+                        const ratioStyle = `aspect-ratio:${Number(variant.width || 1)} / ${Number(variant.height || 1)}`;
+                        return `
+                            <article class="variant-card" data-variant-id="${escapeHtml(variant.id)}">
+                                <div class="variant-preview" style="${escapeHtml(ratioStyle)}">
+                                    ${isVideo ? `
+                                        <div class="variant-video-spec">
+                                            <span>${escapeHtml(variant.aspectRatio || "-")}</span>
+                                            <small>${escapeHtml(variant.format || "MP4/MOV")}</small>
+                                        </div>
+                                    ` : canGenerateImages ? `
+                                        <img src="${escapeHtml(sourceUrl)}" alt="${escapeHtml(variant.channel)} preview">
+                                    ` : ""}
+                                </div>
+                                <div class="variant-body">
+                                    <div>
+                                        <h3>${escapeHtml(variant.channel)}</h3>
+                                        <p>${escapeHtml(variant.width)} x ${escapeHtml(variant.height)} | ${escapeHtml(variant.aspectRatio)}</p>
+                                    </div>
+                                    <span class="variant-status">${escapeHtml(variant.status || "Ready")}</span>
+                                </div>
+                                ${canGenerateImages
+                                    ? `<button type="button" class="primary-btn variant-download-btn">Download PNG</button>`
+                                    : `<button type="button" class="primary-btn variant-download-btn">${variant.fileUrl ? "Download MP4" : "Download Source Video"}</button>`}
+                            </article>
+                        `;
+                    }).join("")}
+                </div>
+            ` : ""}
+        </section>
+    `;
+
+    approvedVariantPanel.querySelector(".variant-source-download-btn")?.addEventListener("click", () => {
+        downloadAttachment(approvedCreative);
+    });
+
+    approvedVariantPanel.querySelectorAll(".variant-card").forEach((card) => {
+        const variantId = card.getAttribute("data-variant-id") || "";
+        const variant = variants.find((item) => String(item.id) === variantId);
+        const button = card.querySelector(".variant-download-btn");
+        if (!variant || !button) return;
+
+        button.addEventListener("click", () => {
+            if (canGenerateImages) {
+                downloadImageVariant(variant, approvedCreative, button);
+                return;
+            }
+            downloadVariantFile(variant, approvedCreative);
+        });
+    });
+}
+
 function renderCreatives(creativeAssets) {
     creativeList.innerHTML = "";
+    renderApprovedVariants(creativeAssets);
 
     const campaignAccepted = normalizeCampaignStatus(currentCampaign?.status) === "Accepted";
     const isAgencyViewer = role === "Agency" && agencyId && currentCampaign?.agencyId === agencyId;
@@ -414,9 +898,25 @@ function renderCreatives(creativeAssets) {
             creativeUploadHint.textContent = "Accept the campaign brief first, then upload your creative files here.";
         } else if (hasApprovedCreative) {
             creativeUploadHint.textContent = "Uploads are locked because a creative version is already approved.";
+        } else if (isVideoCampaign()) {
+            creativeUploadHint.textContent = "Use Add New Creative to upload a video file for review.";
         } else {
             creativeUploadHint.textContent = "Use Add New Creative to upload the next version with description.";
         }
+    }
+
+    const isBrandManager = role === "BrandManager";
+    const isMarketingManager = role === "MarketingManager";
+    const canManagerComment = isBrandManager || isMarketingManager;
+    const canAgencyReply = isAgencyViewer && campaignAccepted;
+
+    if (isVideoCampaign()) {
+        renderVideoCreatives(creativeAssets, {
+            isBrandManager,
+            canManagerComment,
+            canAgencyReply
+        });
+        return;
     }
 
     if (!creativeAssets?.length) {
@@ -433,11 +933,6 @@ function renderCreatives(creativeAssets) {
             return toTimestamp(b?.uploadedAt) - toTimestamp(a?.uploadedAt);
         });
 
-    const isBrandManager = role === "BrandManager";
-    const isMarketingManager = role === "MarketingManager";
-    const canManagerComment = isBrandManager || isMarketingManager;
-    const canAgencyReply = isAgencyViewer && campaignAccepted;
-
     const rows = sortedCreatives.map((asset) => {
         const normalizedReviewStatus = normalizeCreativeStatus(asset.reviewStatus);
         const comments = Array.isArray(asset.comments) ? asset.comments : [];
@@ -446,7 +941,7 @@ function renderCreatives(creativeAssets) {
             : `<p class="empty-text">No feedback yet.</p>`;
 
         return `
-            <tr data-creative-id="${escapeHtml(asset.id)}">
+            <tr data-creative-id="${escapeHtml(asset.id)}" class="${escapeHtml(creativeRowStatusClass(normalizedReviewStatus))}">
                 <td>V${escapeHtml(asset.version || 1)}</td>
                 <td>${escapeHtml(formatDateTime(asset.uploadedAt))}</td>
                 <td>${escapeHtml(asset.description || "-")}</td>
@@ -528,6 +1023,7 @@ function renderCreatives(creativeAssets) {
                 await submitCreativeComment(asset.id, commentInput?.value || "", commentMessage, commentInput);
             });
         }
+
     });
 }
 function applyCampaignDetails(campaign) {
@@ -541,21 +1037,22 @@ function applyCampaignDetails(campaign) {
     document.title = `KOALA by Nestle | ${campaign.title || "Campaign Detail"}`;
 
     titleEl.textContent = campaign.title || "Campaign Detail";
-    campaignBudgetEl.textContent = campaign.budgetRange ? `Budget: ${campaign.budgetRange}` : "Budget: -";
+    campaignBudgetEl.textContent = campaign.budgetRange
+        ? `Product: ${campaign.productName || "-"} | Budget: ${campaign.budgetRange}`
+        : `Product: ${campaign.productName || "-"} | Budget: -`;
 
     statusEl.textContent = displayStatus;
     statusEl.className = `status-pill ${statusClass(displayStatus)}`;
     statusDetailEl.textContent = displayStatus;
 
     targetAudienceEl.textContent = campaign.targetAudience || "-";
-    startDateEl.textContent = formatDate(campaign.startDate);
-    endDateEl.textContent = formatDate(campaign.endDate);
+    campaignTypeEl.textContent = campaign.campaignType || "-";
     campaignTimelineEl.textContent = timeline;
     campaignAudienceChipEl.textContent = campaign.targetAudience
         ? `Audience: ${campaign.targetAudience}`
         : "Audience pending";
     descriptionEl.textContent = campaign.description || "-";
-    objectivesEl.textContent = campaign.objectives || "-";
+    objectivesEl.textContent = campaign.campaignGoal || campaign.objectives || "-";
 
     rejectionReasonSection.hidden = !reason;
     rejectionReasonText.textContent = reason || "-";
@@ -682,7 +1179,7 @@ async function submitCreativeUpload(event) {
     }
 }
 
-async function submitCreativeComment(creativeId, message, messageEl, inputEl) {
+async function submitCreativeComment(creativeId, message, messageEl, inputEl, timestampSeconds = null) {
     if (!currentCampaign || !creativeId || !userId) return;
 
     const normalizedMessage = String(message || "").trim();
@@ -707,7 +1204,8 @@ async function submitCreativeComment(creativeId, message, messageEl, inputEl) {
                 userId,
                 role,
                 agencyId,
-                message: normalizedMessage
+                message: normalizedMessage,
+                timestampSeconds
             })
         });
 

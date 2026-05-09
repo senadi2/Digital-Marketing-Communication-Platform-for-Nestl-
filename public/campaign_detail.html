@@ -35,7 +35,7 @@
 
     <section class="detail-layout">
       <div class="detail-main">
-        <section class="detail-card">
+        <section class="detail-card brief-card">
           <div class="section-heading">
             <div>
               <p class="section-label">Brief Overview</p>
@@ -45,7 +45,7 @@
           <p id="description">-</p>
         </section>
 
-        <section class="detail-card">
+        <section class="detail-card brief-card">
           <div class="section-heading">
             <div>
               <p class="section-label">Expected Outcomes</p>
@@ -55,7 +55,7 @@
           <p id="objectives">-</p>
         </section>
 
-        <section class="detail-card">
+        <section class="detail-card brief-card">
           <div class="section-heading">
             <div>
               <p class="section-label">Supporting Material</p>
@@ -80,16 +80,12 @@
               <p id="targetAudience">-</p>
             </div>
             <div class="info-item">
+              <label>Campaign Type</label>
+              <p id="campaignType">-</p>
+            </div>
+            <div class="info-item">
               <label>Status</label>
               <p id="statusDetail">Pending</p>
-            </div>
-            <div class="info-item">
-              <label>Start Date</label>
-              <p id="startDate">-</p>
-            </div>
-            <div class="info-item">
-              <label>End Date</label>
-              <p id="endDate">-</p>
             </div>
           </div>
         </section>
@@ -112,6 +108,7 @@
 
           <p id="creativeUploadMessage" class="decision-message" aria-live="polite"></p>
           <div id="creativeList" class="creative-list"></div>
+          <div id="approvedVariantPanel" class="approved-variant-panel"></div>
 
           <div class="creative-upload-modal" id="creativeUploadModal" hidden>
             <div class="creative-upload-dialog" role="dialog" aria-modal="true" aria-labelledby="creativeUploadModalTitle">

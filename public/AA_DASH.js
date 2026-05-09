@@ -91,6 +91,7 @@ async function renderCampaigns(campaigns) {
             <div class="campaign-card-content">
                 <h3>${escapeHtml(c.title)}</h3>
                 <img src="${escapeHtml(uniqueImage || DEFAULT_IMAGE)}" alt="${escapeHtml(c.title)} campaign image">
+                <p><strong>Campaign Type:</strong> ${escapeHtml(c.campaignType || "-")}</p>
                 <p><strong>Timeline:</strong> ${escapeHtml(c.startDate)} to ${escapeHtml(c.endDate)}</p>
                 <p><strong>Budget:</strong> ${escapeHtml(c.budgetRange)}</p>
             </div>

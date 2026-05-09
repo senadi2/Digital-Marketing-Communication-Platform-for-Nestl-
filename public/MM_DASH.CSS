@@ -248,7 +248,8 @@ body {
     font-size: 12px;
 }
 
-.addAgencyBtn,.logout,
+.addAgencyBtn,.secondaryTopBtn,.logout,
+.viewMoreProducts,
 .viewMore,
 .primary-btn {
     border: none;
@@ -262,10 +263,17 @@ body {
 }
 
 .addAgencyBtn:hover,
+.secondaryTopBtn:hover,
+.viewMoreProducts:hover,
 .viewMore:hover,
 .primary-btn:hover {
     background: var(--primary-dark);
     transform: translateY(-1px);
+}
+
+.secondaryTopBtn {
+    background: var(--primary);
+    color: white;
 }
 
 .hero-banner {
@@ -338,6 +346,10 @@ body {
 }
 
 .slideshow-section {
+    margin-bottom: 24px;
+}
+
+#product-section {
     margin-bottom: 24px;
 }
 
@@ -426,9 +438,17 @@ body {
 
 .agency-card h3 {
     margin: 0;
-    padding: 18px 20px;
+    padding: 18px 20px 6px;
     font-size: 20px;
     color: var(--text);
+}
+
+.card-meta {
+    margin: 0;
+    padding: 0 20px 18px;
+    color: var(--text-soft);
+    font-size: 14px;
+    line-height: 1.4;
 }
 
 .section-actions {

@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>KOALA by Nestle | Campaign Progress</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+<link rel="icon" href="Images/faviconimg.png" type="image/png">
+<link rel="stylesheet" href="MM_DASH.CSS">
+<link rel="stylesheet" href="campaign_progress_overview.css">
+</head>
+
+<body>
+<div class="container">
+  <aside class="sidebar">
+    <div class="logo">
+      <img src="Images/logo_nobackground.png" alt="Nestle platform logo">
+    </div>
+
+    <div class="sidebar-copy">
+      <h2>Total Visibility. Better Decisions. Faster Results.</h2>
+      <p class="sidebar-text">Built for speed, clarity, and better advertising outcomes.</p>
+    </div>
+
+    <ul class="nav">
+      <li><i class="fa-solid fa-box-open"></i><a href="MM_dash.html#product-section"><span>Products</span></a></li>
+      <li><i class="fa-solid fa-building-user"></i><a href="MM_dash.html#agency-section"><span>Agencies</span></a></li>
+      <li class="active"><i class="fa-solid fa-chart-line"></i><a href="campaign_progress_overview.html"><span>Campaign Progress</span></a></li>
+      <li><i class="fa-solid fa-gauge-high"></i><a href="agency_performance.html"><span>Agency Performance</span></a></li>
+    </ul>
+  </aside>
+
+  <main class="main overview-main">
+    <div class="topbar">
+      <div class="topbar-meta">
+        <img src="Images/logo.svg" alt="Nestle logo">
+      </div>
+
+      <div class="topbar-actions">
+        <button class="logout" type="button" onclick="logout()">Sign Out</button>
+      </div>
+    </div>
+
+    <section class="overview-header">
+      <div>
+        <p class="section-label">Campaign Progress Overview</p>
+        <h1>All Campaigns at a Glance</h1>
+      </div>
+      <p id="updatedAt">Loading...</p>
+    </section>
+
+    <section class="overview-stats" id="summaryStats" aria-label="Campaign summary"></section>
+
+    <section class="overview-grid">
+      <article class="overview-panel pipeline-panel">
+        <div class="panel-heading">
+          <div>
+            <p class="section-label">Pipeline Health</p>
+            <h2>Status Breakdown</h2>
+          </div>
+        </div>
+        <div class="status-bars" id="statusBars"></div>
+      </article>
+
+      <article class="overview-panel action-panel">
+        <div class="panel-heading">
+          <div>
+            <p class="section-label">Manager Attention</p>
+            <h2>Needs Follow-up</h2>
+          </div>
+        </div>
+        <div class="action-list" id="actionList"></div>
+      </article>
+    </section>
+
+    <section class="overview-panel campaign-panel">
+      <div class="panel-heading campaign-panel-heading">
+        <div>
+          <p class="section-label">Campaign Register</p>
+          <h2>Campaign Summary</h2>
+        </div>
+        <div class="filter-group" aria-label="Filter campaigns">
+          <button type="button" class="filter-btn active" data-filter="All">All</button>
+          <button type="button" class="filter-btn" data-filter="Pending">Pending</button>
+          <button type="button" class="filter-btn" data-filter="In Progress">In Progress</button>
+          <button type="button" class="filter-btn" data-filter="Approved">Approved</button>
+          <button type="button" class="filter-btn" data-filter="Declined">Declined</button>
+        </div>
+      </div>
+
+      <div class="campaign-table-wrap">
+        <table class="campaign-table">
+          <thead>
+            <tr>
+              <th>Campaign</th>
+              <th>Product</th>
+              <th>Agency</th>
+              <th>Status</th>
+              <th>Approvals</th>
+              <th>Progress</th>
+              <th>Timeline</th>
+            </tr>
+          </thead>
+          <tbody id="campaignTableBody"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <footer>
+      Nestle Digital Marketing Platform | System Version 1.0 | &copy; 2026 Nestle Sri Lanka
+    </footer>
+  </main>
+</div>
+
+<script src="session_timeout.js"></script>
+<script src="campaign_progress_overview.js"></script>
+</body>
+</html>

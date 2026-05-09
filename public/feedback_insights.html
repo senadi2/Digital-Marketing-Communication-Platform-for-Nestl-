@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>KOALA by Nestle | Feedback & Performance</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+<link rel="icon" href="Images/faviconimg.png" type="image/png">
+<link rel="stylesheet" href="AA_DASH.css">
+<link rel="stylesheet" href="agency_chat.css">
+<link rel="stylesheet" href="feedback_insights.css">
+</head>
+
+<body>
+<div class="container">
+  <aside class="sidebar">
+    <div class="logo">
+      <img src="Images/logo_nobackground.png" alt="Nestle platform logo">
+    </div>
+
+    <div class="sidebar-copy">
+      <h2>Smarter Campaigns. Seamless Collaboration.</h2>
+      <p class="sidebar-text">Built for speed, clarity, and better advertising outcomes.</p>
+    </div>
+
+    <ul class="nav">
+      <li><i class="fa-solid fa-house"></i><a href="AA_DASH.html"><span>Home</span></a></li>
+      <li class="active"><i class="fa-solid fa-lightbulb"></i><a href="feedback_insights.html"><span>Feedback & Performance</span></a></li>
+    </ul>
+
+    <div class="sidebar-chat-launch">
+      <button type="button" class="sidebar-chat-btn" id="agencyChatTrigger" aria-label="Open agency chat">
+        <i class="fa-solid fa-comments"></i>
+        <span>Agency Chat</span>
+      </button>
+    </div>
+  </aside>
+
+  <main class="main feedback-main">
+    <div class="topbar">
+      <div class="topbar-meta">
+        <img src="Images/logo.svg" alt="Nestle logo">
+      </div>
+
+      <div class="topbar-actions">
+        <button class="logout" type="button">Sign Out</button>
+      </div>
+    </div>
+
+    <section class="feedback-header">
+      <div>
+        <h1>Agency Feedback & Performance</h1>
+        <p>Track recurring manager feedback, improvement tips, and your agency score in one focused view.</p>
+      </div>
+      <p id="updatedAt">Loading...</p>
+    </section>
+
+    <section class="feedback-layout">
+      <article class="feedback-panel themes-panel">
+        <div class="panel-heading">
+          <div>
+            <p class="section-label">Repeated Themes</p>
+            <h2>Top Feedback Patterns</h2>
+          </div>
+        </div>
+        <div class="theme-list" id="themeList"></div>
+      </article>
+
+      <article class="feedback-panel score-panel">
+        <div class="panel-heading">
+          <div>
+            <p class="section-label">Private Agency Score</p>
+            <h2>Your Scoreboard</h2>
+          </div>
+        </div>
+        <div class="agency-scoreboard" id="agencyScoreboard"></div>
+      </article>
+    </section>
+
+    <section class="feedback-panel tips-panel">
+      <div class="panel-heading">
+        <div>
+          <p class="section-label">Creative Guidance</p>
+          <h2>Improvement Tips</h2>
+        </div>
+      </div>
+      <div class="tip-list" id="tipList"></div>
+    </section>
+
+    <footer>
+      Nestle Digital Marketing Platform | System Version 1.0 | &copy; 2026 Nestle Sri Lanka
+    </footer>
+  </main>
+</div>
+
+<script src="session_timeout.js"></script>
+<script src="agency_chat.js"></script>
+<script src="feedback_insights.js"></script>
+</body>
+</html>

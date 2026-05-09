@@ -23,8 +23,10 @@
     </div>
 
     <ul class="nav">
-      <li class="active"><i class="fa-solid fa-house"></i><span>Home</span></li>
+      <li class="active"><i class="fa-solid fa-box-open"></i><a href="#product-section"><span>Products</span></a></li>
       <li><i class="fa-solid fa-building-user"></i><a href="#agency-section"><span>Agencies</span></a></li>
+      <li><i class="fa-solid fa-chart-line"></i><a href="campaign_progress_overview.html"><span>Campaign Progress</span></a></li>
+      <li><i class="fa-solid fa-gauge-high"></i><a href="agency_performance.html"><span>Agency Performance</span></a></li>
     </ul>
   </aside>
 
@@ -46,7 +48,7 @@
           </div>
           <div id="notificationList" class="notification-list"></div>
         </div>
-        <button class="addAgencyBtn" type="button" onclick="openModal()">+ Add New Agency</button>
+        <button class="secondaryTopBtn" type="button" onclick="openAgencyModal()">+ Add Agency</button>
         <button class="logout" type="button" onclick="logout()">Sign Out</button>
       </div>
     </div>
@@ -91,6 +93,22 @@
       </div>
     </section>
 
+    <section class="agency-section" id="product-section">
+      <div class="section-heading">
+        <div>
+          <p class="section-label">Product Portfolio</p>
+          <h2>Nestlé Products</h2>
+        </div>
+        <button class="addAgencyBtn" type="button" onclick="openProductModal()">+ Add Product</button>
+      </div>
+
+      <div class="agency-grid" id="productList"></div>
+
+      <div class="section-actions">
+        <button class="viewMoreProducts" style="display:none;">View More</button>
+      </div>
+    </section>
+
     <section class="agency-section" id="agency-section">
       <div class="section-heading">
         <div>
@@ -110,6 +128,24 @@
       Nestlé Digital Marketing Platform | System Version 1.0 | &copy; 2026 Nestlé Sri Lanka
     </footer>
   </main>
+</div>
+
+<div class="modal" id="productModal">
+  <div class="modal-content">
+    <h2>Register New Product</h2>
+
+    <form id="productForm" class="agency-form">
+      <input id="productName" type="text" placeholder="Product Name, e.g. Milo" required>
+      <input id="productCategory" type="text" placeholder="Product Category" required>
+
+      <div class="modal-actions">
+        <button type="button" class="secondary-btn" onclick="closeProductModal()">Cancel</button>
+        <button type="submit" class="primary-btn">Create Product</button>
+      </div>
+
+      <p id="productFormMessage" class="form-message" aria-live="polite"></p>
+    </form>
+  </div>
 </div>
 
 <div class="modal" id="agencyModal">

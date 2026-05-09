@@ -1,29 +1,27 @@
+const productList = document.getElementById("productList");
 const agencyList = document.getElementById("agencyList");
-const form = document.getElementById("agencyForm");
+const productForm = document.getElementById("productForm");
+const agencyForm = document.getElementById("agencyForm");
+const productFormMessage = document.getElementById("productFormMessage");
 const formMessage = document.getElementById("formMessage");
 const viewMoreBtn = document.querySelector(".viewMore");
+const viewMoreProductsBtn = document.querySelector(".viewMoreProducts");
 const notificationBell = document.getElementById("notificationBell");
 const notificationPanel = document.getElementById("notificationPanel");
 const notificationList = document.getElementById("notificationList");
 const notificationCount = document.getElementById("notificationCount");
 const clearAllNotificationsBtn = document.getElementById("clearAllNotificationsBtn");
 
-const DEFAULT_IMAGE = "/api/media/agency-image?seed=default&name=Agency";
+const DEFAULT_AGENCY_IMAGE = "/api/media/agency-image?seed=default&name=Agency";
+const DEFAULT_PRODUCT_IMAGE = "Images/logo_nobackground.png";
 const mmUserId = localStorage.getItem("userId") || "";
 const AGENCY_EMAIL_DOMAIN = "@aanestle.com";
 
+let allProducts = [];
 let allAgencies = [];
-let currentIndex = 0;
-const agenciesPerPage = 3;
-
-async function fetchAgencyImage(query = "agency office marketing") {
-    return getUniqueFallbackImage(`agency-${query}-${Date.now()}`);
-}
-
-function formatDate(isoDate) {
-    if (!isoDate) return "";
-    return new Date(isoDate).toLocaleString();
-}
+let currentProductIndex = 0;
+let currentAgencyIndex = 0;
+const itemsPerPage = 3;
 
 function escapeHtml(value) {
     return String(value || "")
@@ -34,45 +32,118 @@ function escapeHtml(value) {
         .replace(/'/g, "&#39;");
 }
 
+function formatDate(isoDate) {
+    if (!isoDate) return "";
+    return new Date(isoDate).toLocaleString();
+}
+
+function productLogoBase(productName) {
+    const normalized = String(productName || "nestle")
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "")
+        .toLowerCase()
+        .replace(/^nestle\s+/, "")
+        .replace(/[^a-z0-9]/g, "");
+    const aliases = {
+        milkmaid: "milkmade"
+    };
+    return aliases[normalized] || normalized || "nestle";
+}
+
+function productImage(product) {
+    return `Images/${productLogoBase(product.name)}_logoP.png`;
+}
+
+function useNextProductImage(event, productName) {
+    const img = event.currentTarget;
+    const attempts = Number(img.dataset.logoAttempt || 0);
+    const extensions = ["webp", "jpg", "jpeg"];
+    if (attempts < extensions.length) {
+        img.dataset.logoAttempt = String(attempts + 1);
+        img.src = `Images/${productLogoBase(productName)}_logoP.${extensions[attempts]}`;
+        return;
+    }
+    img.src = DEFAULT_PRODUCT_IMAGE;
+}
+
+function agencyImage(agency) {
+    return agency.imageUrl || `/api/media/agency-image?seed=${encodeURIComponent(agency._id || agency.name || Date.now())}&name=${encodeURIComponent(agency.name || "Agency")}`;
+}
+
+function createProductCard(product) {
+    const card = document.createElement("div");
+    card.className = "agency-card";
+    card.innerHTML = `
+        <img src="${escapeHtml(productImage(product) || DEFAULT_PRODUCT_IMAGE)}" alt="${escapeHtml(product.name || "Product")}">
+        <h3>${escapeHtml(product.name || "Unnamed Product")}</h3>
+        <p class="card-meta">${escapeHtml(product.category || "Product")} | ${Number(product.campaignCount || 0)} campaign(s)</p>
+    `;
+    card.querySelector("img").addEventListener("error", (event) => useNextProductImage(event, product.name));
+    card.addEventListener("click", () => {
+        window.location.href = `create_brief.html?productId=${encodeURIComponent(product._id)}`;
+    });
+    productList.appendChild(card);
+}
+
 function createAgencyCard(agency) {
     const card = document.createElement("div");
     card.className = "agency-card";
-
-    const img = document.createElement("img");
-    img.src = agency.displayImageUrl || agency.imageUrl || DEFAULT_IMAGE;
-    img.alt = agency.name;
-    img.addEventListener("error", () => {
-        img.src = getUniqueFallbackImage(`agency-img-${agency._id || agency.name || Date.now()}`);
+    card.innerHTML = `
+        <img src="${escapeHtml(agencyImage(agency) || DEFAULT_AGENCY_IMAGE)}" alt="${escapeHtml(agency.name || "Agency")}">
+        <h3>${escapeHtml(agency.name || "Unnamed Agency")}</h3>
+        <p class="card-meta">${escapeHtml(agency.description || "Agency partner")}</p>
+    `;
+    card.querySelector("img").addEventListener("error", (event) => {
+        event.currentTarget.src = DEFAULT_AGENCY_IMAGE;
     }, { once: true });
-
-    const name = document.createElement("h3");
-    name.textContent = agency.name;
-
-    card.appendChild(img);
-    card.appendChild(name);
-
     card.addEventListener("click", () => {
-        window.location.href = `create_brief.html?agencyId=${agency._id}`;
+        window.location.href = `create_brief.html?agencyId=${encodeURIComponent(agency._id)}`;
     });
-
     agencyList.appendChild(card);
 }
 
-function getUniqueFallbackImage(seedValue) {
-    return `/api/media/agency-image?seed=${encodeURIComponent(seedValue)}&name=${encodeURIComponent("Agency Partner")}`;
+function showMoreProducts() {
+    const nextIndex = currentProductIndex + itemsPerPage;
+    for (let i = currentProductIndex; i < nextIndex && i < allProducts.length; i++) {
+        createProductCard(allProducts[i]);
+    }
+    currentProductIndex = nextIndex;
+    viewMoreProductsBtn.style.display = currentProductIndex < allProducts.length ? "block" : "none";
 }
 
-function hydrateAgencyImages(agencies) {
-    const used = new Set();
+function showMoreAgencies() {
+    const nextIndex = currentAgencyIndex + itemsPerPage;
+    for (let i = currentAgencyIndex; i < nextIndex && i < allAgencies.length; i++) {
+        createAgencyCard(allAgencies[i]);
+    }
+    currentAgencyIndex = nextIndex;
+    viewMoreBtn.style.display = currentAgencyIndex < allAgencies.length ? "block" : "none";
+}
 
-    return agencies.map(agency => {
-        let resolvedUrl = agency.imageUrl || "";
-        if (!resolvedUrl || used.has(resolvedUrl)) {
-            resolvedUrl = getUniqueFallbackImage(`agency-${agency.name}-${agency._id || Date.now()}`);
-        }
-        used.add(resolvedUrl);
-        return { ...agency, displayImageUrl: resolvedUrl };
-    });
+async function loadProducts() {
+    try {
+        const res = await fetch("/api/products");
+        const products = await res.json();
+        allProducts = Array.isArray(products) ? products : [];
+        productList.innerHTML = "";
+        currentProductIndex = 0;
+        showMoreProducts();
+    } catch (err) {
+        console.error(err);
+    }
+}
+
+async function loadAgencies() {
+    try {
+        const res = await fetch("/api/agencies");
+        const agencies = await res.json();
+        allAgencies = Array.isArray(agencies) ? agencies : [];
+        agencyList.innerHTML = "";
+        currentAgencyIndex = 0;
+        showMoreAgencies();
+    } catch (err) {
+        console.error(err);
+    }
 }
 
 function renderNotifications(notes) {
@@ -84,10 +155,8 @@ function renderNotifications(notes) {
         return;
     }
 
-    const unreadNotes = notes.filter(note => !note.read);
     notificationList.innerHTML = "";
-
-    unreadNotes.forEach(note => {
+    notes.filter(note => !note.read).forEach(note => {
         const item = document.createElement("div");
         item.className = "notification-item";
         item.innerHTML = `
@@ -97,8 +166,7 @@ function renderNotifications(notes) {
             </div>
             <div class="notification-time">${formatDate(note.createdAt)}</div>
         `;
-        const clearBtn = item.querySelector(".notification-clear");
-        clearBtn.addEventListener("click", () => clearNotification(note._id));
+        item.querySelector(".notification-clear").addEventListener("click", () => clearNotification(note._id));
         notificationList.appendChild(item);
     });
 }
@@ -120,153 +188,123 @@ async function loadNotifications() {
 
 async function clearNotification(notificationId) {
     if (!notificationId) return;
-    try {
-        await fetch(`/api/notifications/${encodeURIComponent(notificationId)}/read`, {
-            method: "PATCH"
-        });
-        await loadNotifications();
-    } catch (err) {
-        console.error(err);
-    }
+    await fetch(`/api/notifications/${encodeURIComponent(notificationId)}/read`, { method: "PATCH" });
+    await loadNotifications();
 }
 
 async function clearAllNotifications() {
     if (!mmUserId) return;
-    try {
-        await fetch("/api/notifications/read-all", {
-            method: "PATCH",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ userId: mmUserId })
-        });
-        await loadNotifications();
-    } catch (err) {
-        console.error(err);
-    }
+    await fetch("/api/notifications/read-all", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userId: mmUserId })
+    });
+    await loadNotifications();
 }
 
-async function showMoreAgencies() {
-    const nextIndex = currentIndex + agenciesPerPage;
-    for (let i = currentIndex; i < nextIndex && i < allAgencies.length; i++) {
-        createAgencyCard(allAgencies[i]);
-    }
-
-    currentIndex = nextIndex;
-    viewMoreBtn.style.display = currentIndex < allAgencies.length ? "block" : "none";
+function setProductMessage(message, type) {
+    productFormMessage.textContent = message;
+    productFormMessage.className = `form-message ${type}`;
 }
 
-async function loadAgencies() {
-    try {
-        const res = await fetch("/api/agencies");
-        const agencies = await res.json();
-        allAgencies = hydrateAgencyImages(Array.isArray(agencies) ? agencies : []);
-        agencyList.innerHTML = "";
-        currentIndex = 0;
-        showMoreAgencies();
-    } catch (err) {
-        console.error(err);
-    }
-}
-
-viewMoreBtn.addEventListener("click", showMoreAgencies);
-
-form.addEventListener("submit", async (e) => {
-    e.preventDefault();
-
-    const name = document.getElementById("agencyName").value.trim();
-    const contactPerson = document.getElementById("contactPerson").value.trim();
-    const phoneNumber = document.getElementById("phoneNumber").value.trim();
-    const username = document.getElementById("username").value.trim();
-    const password = document.getElementById("password").value;
-    const description = document.getElementById("description").value.trim();
-
-    const formData = { name, contactPerson, phoneNumber, username, password, description };
-    if (Object.values(formData).some(v => !v)) {
-        setMessage("Please fill all fields", "error");
-        return;
-    }
-
-    const normalizedUsername = username.toLowerCase();
-    if (!normalizedUsername.endsWith(AGENCY_EMAIL_DOMAIN)) {
-        setMessage(`Agency email must end with ${AGENCY_EMAIL_DOMAIN}`, "error");
-        return;
-    }
-
-    const normalizedName = name.toLowerCase();
-    const normalizedContactPerson = contactPerson.toLowerCase();
-    const duplicateAgency = allAgencies.find((agency) => (
-        String(agency.name || "").trim().toLowerCase() === normalizedName
-        && String(agency.contactPerson || "").trim().toLowerCase() === normalizedContactPerson
-    ));
-
-    if (duplicateAgency) {
-        setMessage("Agency is already registered", "error");
-        return;
-    }
-
-    try {
-        const existingUrls = new Set(allAgencies.map(a => a.displayImageUrl || a.imageUrl).filter(Boolean));
-        let imageUrl = "";
-
-        for (let i = 0; i < 5; i++) {
-            const candidate = await fetchAgencyImage(`${name} advertising office`);
-            if (!existingUrls.has(candidate)) {
-                imageUrl = candidate;
-                break;
-            }
-        }
-
-        if (!imageUrl) {
-            imageUrl = getUniqueFallbackImage(`agency-${name}-${Date.now()}`);
-        }
-
-        const payload = { ...formData, username: normalizedUsername, imageUrl };
-
-        const res = await fetch("/api/agencies", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(payload)
-        });
-
-        const data = await res.json();
-        if (!res.ok) {
-            setMessage(data.message || "Failed to create agency", "error");
-            return;
-        }
-
-        if (data.agency) {
-            allAgencies = hydrateAgencyImages([data.agency, ...allAgencies]);
-            agencyList.innerHTML = "";
-            currentIndex = 0;
-            showMoreAgencies();
-        }
-
-        setMessage("Agency created successfully!", "success");
-        setTimeout(closeModal, 1200);
-    } catch {
-        setMessage("Server error", "error");
-    }
-});
-
-function setMessage(message, type) {
+function setAgencyMessage(message, type) {
     formMessage.textContent = message;
     formMessage.className = `form-message ${type}`;
 }
 
-window.openModal = () => {
+productForm.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const payload = {
+        name: document.getElementById("productName").value.trim(),
+        category: document.getElementById("productCategory").value.trim()
+    };
+
+    if (Object.values(payload).some(value => !value)) {
+        setProductMessage("Please fill all product fields", "error");
+        return;
+    }
+
+    try {
+        const res = await fetch("/api/products", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload)
+        });
+        const data = await res.json();
+        if (!res.ok) {
+            setProductMessage(data.message || "Failed to create product", "error");
+            return;
+        }
+        closeProductModal();
+        await loadProducts();
+    } catch {
+        setProductMessage("Server error", "error");
+    }
+});
+
+agencyForm.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const name = document.getElementById("agencyName").value.trim();
+    const contactPerson = document.getElementById("contactPerson").value.trim();
+    const phoneNumber = document.getElementById("phoneNumber").value.trim();
+    const username = document.getElementById("username").value.trim().toLowerCase();
+    const password = document.getElementById("password").value;
+    const description = document.getElementById("description").value.trim();
+
+    if (!name || !contactPerson || !phoneNumber || !username || !password || !description) {
+        setAgencyMessage("Please fill all fields", "error");
+        return;
+    }
+    if (!username.endsWith(AGENCY_EMAIL_DOMAIN)) {
+        setAgencyMessage(`Agency email must end with ${AGENCY_EMAIL_DOMAIN}`, "error");
+        return;
+    }
+
+    try {
+        const res = await fetch("/api/agencies", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ name, contactPerson, phoneNumber, username, password, description })
+        });
+        const data = await res.json();
+        if (!res.ok) {
+            setAgencyMessage(data.message || "Failed to create agency", "error");
+            return;
+        }
+        closeModal();
+        await loadAgencies();
+    } catch {
+        setAgencyMessage("Server error", "error");
+    }
+});
+
+window.openProductModal = () => {
+    document.getElementById("productModal").style.display = "flex";
+};
+
+window.closeProductModal = () => {
+    document.getElementById("productModal").style.display = "none";
+    productForm.reset();
+    setProductMessage("", "");
+};
+
+window.openAgencyModal = () => {
     document.getElementById("agencyModal").style.display = "flex";
 };
 
+window.openModal = window.openAgencyModal;
+
 window.closeModal = () => {
     document.getElementById("agencyModal").style.display = "none";
-    form.reset();
-    setMessage("", "");
+    agencyForm.reset();
+    setAgencyMessage("", "");
 };
 
 let slides = document.querySelectorAll(".slide");
 let index = 0;
 function showSlides() {
     slides.forEach(slide => slide.classList.remove("active"));
-    index++;
+    index += 1;
     if (index > slides.length) index = 1;
     slides[index - 1].classList.add("active");
 }
@@ -281,23 +319,19 @@ window.logout = () => {
     window.location.href = "/LOGIN.html";
 };
 
-notificationBell?.addEventListener("click", () => {
-    notificationPanel.classList.toggle("open");
-});
-
-clearAllNotificationsBtn?.addEventListener("click", () => {
-    clearAllNotifications();
-});
+viewMoreProductsBtn.addEventListener("click", showMoreProducts);
+viewMoreBtn.addEventListener("click", showMoreAgencies);
+notificationBell?.addEventListener("click", () => notificationPanel.classList.toggle("open"));
+clearAllNotificationsBtn?.addEventListener("click", clearAllNotifications);
 
 document.addEventListener("click", (event) => {
     if (!notificationPanel || !notificationBell) return;
-    const clickInsidePanel = notificationPanel.contains(event.target);
-    const clickOnBell = notificationBell.contains(event.target);
-    if (!clickInsidePanel && !clickOnBell) {
+    if (!notificationPanel.contains(event.target) && !notificationBell.contains(event.target)) {
         notificationPanel.classList.remove("open");
     }
 });
 
+loadProducts();
 loadAgencies();
 loadNotifications();
 setInterval(loadNotifications, 30000);

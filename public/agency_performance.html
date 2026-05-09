@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>KOALA by Nestle | Agency Performance</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+<link rel="icon" href="Images/faviconimg.png" type="image/png">
+<link rel="stylesheet" href="MM_DASH.CSS">
+<link rel="stylesheet" href="agency_performance.css">
+</head>
+
+<body>
+<div class="container">
+  <aside class="sidebar">
+    <div class="logo">
+      <img src="Images/logo_nobackground.png" alt="Nestle platform logo">
+    </div>
+
+    <div class="sidebar-copy">
+      <h2>Total Visibility. Better Decisions. Faster Results.</h2>
+      <p class="sidebar-text">Built for speed, clarity, and better advertising outcomes.</p>
+    </div>
+
+    <ul class="nav">
+      <li><i class="fa-solid fa-box-open"></i><a href="MM_dash.html#product-section"><span>Products</span></a></li>
+      <li><i class="fa-solid fa-building-user"></i><a href="MM_dash.html#agency-section"><span>Agencies</span></a></li>
+      <li><i class="fa-solid fa-chart-line"></i><a href="campaign_progress_overview.html"><span>Campaign Progress</span></a></li>
+      <li class="active"><i class="fa-solid fa-gauge-high"></i><a href="agency_performance.html"><span>Agency Performance</span></a></li>
+    </ul>
+  </aside>
+
+  <main class="main performance-main">
+    <div class="topbar">
+      <div class="topbar-meta">
+        <img src="Images/logo.svg" alt="Nestle logo">
+      </div>
+
+      <div class="topbar-actions">
+        <button class="logout" type="button" onclick="logout()">Sign Out</button>
+      </div>
+    </div>
+
+    <section class="performance-header">
+      <div>
+        <p class="section-label">Agency Performance Monitoring</p>
+        <h1>Agency Efficiency</h1>
+      </div>
+      <p id="updatedAt">Loading...</p>
+    </section>
+
+    <section class="performance-kpis" id="performanceKpis" aria-label="Agency performance summary"></section>
+
+    <section class="performance-layout">
+      <article class="performance-panel leaderboard-panel">
+        <div class="panel-heading">
+          <div>
+            <p class="section-label">Leaderboard</p>
+            <h2>Top Agency Ranking</h2>
+          </div>
+        </div>
+        <div class="leaderboard-list" id="leaderboardList"></div>
+      </article>
+
+      <article class="performance-panel insights-panel">
+        <div class="panel-heading">
+          <div>
+            <p class="section-label">Performance Insights</p>
+            <h2>What Stands Out</h2>
+          </div>
+        </div>
+        <div class="insight-list" id="insightList"></div>
+      </article>
+    </section>
+
+    <section class="agency-card-grid" id="agencyCardGrid" aria-label="Agency scorecards"></section>
+
+    <footer>
+      Nestle Digital Marketing Platform | System Version 1.0 | &copy; 2026 Nestle Sri Lanka
+    </footer>
+  </main>
+</div>
+
+<script src="session_timeout.js"></script>
+<script src="agency_performance.js"></script>
+</body>
+</html>

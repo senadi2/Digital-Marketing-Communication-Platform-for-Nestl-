@@ -79,25 +79,56 @@ h2 {
 
 .agency-info-card {
     margin-bottom: 18px;
+    display: grid;
+    grid-template-columns: minmax(180px, 240px) 1fr;
+    align-items: center;
+    gap: 22px;
 }
 
 .agency-image {
     width: 100%;
-    height: auto;
-    aspect-ratio: 18 / 7;
-    object-fit: cover;
+    aspect-ratio: 1 / 1;
+    object-fit: contain;
     object-position: center;
     display: block;
     border-radius: 16px;
-    margin-bottom: 16px;
-    border: 1px solid var(--border);
-    background: #eef4fb;
+    padding: 18px;
 }
 
 .agency-info-card p {
     margin: 0;
     color: var(--text-soft);
     line-height: 1.6;
+}
+
+.details-copy {
+    min-width: 0;
+}
+
+.product-facts {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 10px;
+    margin-top: 18px;
+}
+
+.product-fact {
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 12px;
+    background: #fff;
+}
+
+.product-fact span {
+    display: block;
+    color: var(--text-soft);
+    font-size: 12px;
+    margin-bottom: 5px;
+}
+
+.product-fact strong {
+    display: block;
+    font-size: 14px;
 }
 
 .campaign-grid {
@@ -267,13 +298,16 @@ h2 {
     inset: 0;
     background: rgba(10, 20, 37, 0.52);
     justify-content: center;
-    align-items: center;
-    padding: 20px;
+    align-items: flex-start;
+    padding: 24px 20px;
+    overflow-y: auto;
     z-index: 1000;
 }
 
 .modal-content {
     width: min(680px, 100%);
+    max-height: calc(100vh - 48px);
+    overflow-y: auto;
     background: #fff;
     border-radius: 18px;
     border: 1px solid var(--border);
@@ -288,6 +322,7 @@ h2 {
 }
 
 .campaign-form input,
+.campaign-form select,
 .campaign-form textarea {
     padding: 11px 12px;
     border: 1px solid #d4dce8;
@@ -302,6 +337,7 @@ h2 {
 }
 
 .campaign-form input:focus,
+.campaign-form select:focus,
 .campaign-form textarea:focus {
     outline: 2px solid rgba(0, 58, 143, 0.25);
     border-color: var(--primary);
@@ -360,8 +396,18 @@ h2 {
         justify-content: stretch;
     }
 
+    .agency-info-card {
+        grid-template-columns: 1fr;
+    }
+
+    .agency-image {
+        max-width: 220px;
+        margin: 0 auto;
+    }
+
     .campaign-grid,
-    .timeline-row {
+    .timeline-row,
+    .product-facts {
         grid-template-columns: 1fr;
     }
 }

@@ -94,6 +94,11 @@ body {
     color: white;
 }
 
+.nav li a {
+    color: inherit;
+    text-decoration: none;
+}
+
 .main {
     flex: 1;
     padding: 28px;

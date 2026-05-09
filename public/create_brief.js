@@ -1,6 +1,6 @@
-const agencyNameEl = document.getElementById("agencyName");
-const agencyDescriptionEl = document.getElementById("agencyDescription");
-const agencyImageEl = document.getElementById("agencyImage");
+const titleEl = document.getElementById("agencyName");
+const descriptionEl = document.getElementById("agencyDescription");
+const heroImageEl = document.getElementById("agencyImage");
 const campaignList = document.getElementById("campaignList");
 const campaignBriefModal = document.getElementById("campaignBriefModal");
 const openBriefModalBtn = document.getElementById("openBriefModalBtn");
@@ -8,24 +8,46 @@ const closeBriefModalBtn = document.getElementById("closeBriefModalBtn");
 const campaignBriefForm = document.getElementById("campaignBriefForm");
 const briefFormMessage = document.getElementById("briefFormMessage");
 const dashboardBackLink = document.getElementById("dashboardBackLink");
+const pageEyebrow = document.getElementById("pageEyebrow");
+const detailsHeading = document.getElementById("detailsHeading");
+const productFacts = document.getElementById("productFacts");
+const campaignSectionTitle = document.getElementById("campaignSectionTitle");
+const assignedAgencySelect = document.getElementById("assignedAgencyId");
+const pageHeaderActions = document.querySelector(".page-header-actions");
+let agencyChatTrigger = document.getElementById("agencyChatTrigger");
 
 const params = new URLSearchParams(window.location.search);
+const productId = params.get("productId");
 const agencyId = params.get("agencyId");
 const mmId = localStorage.getItem("userId") || "";
 const userId = localStorage.getItem("userId") || "";
 const role = localStorage.getItem("role") || "";
-const FALLBACK_IMAGE = "/api/media/agency-image?seed=agency-brief-default&name=Agency";
+
+let currentProduct = null;
+let allAgencies = [];
+
+const DEFAULT_PRODUCT_IMAGE = "Images/logo_nobackground.png";
 
 if (dashboardBackLink && role === "BrandManager") {
     dashboardBackLink.href = "BM_dash.html";
 }
 
-if (role === "BrandManager") {
+if (!productId && agencyId && pageHeaderActions && !agencyChatTrigger) {
+    agencyChatTrigger = document.createElement("button");
+    agencyChatTrigger.type = "button";
+    agencyChatTrigger.className = "agency-chat-trigger";
+    agencyChatTrigger.id = "agencyChatTrigger";
+    agencyChatTrigger.setAttribute("aria-label", "Open agency chat");
+    agencyChatTrigger.innerHTML = `<i class="fa-solid fa-comments"></i><span>Chat</span>`;
+    pageHeaderActions.prepend(agencyChatTrigger);
+}
+
+if (role === "BrandManager" || !productId) {
     openBriefModalBtn.hidden = true;
 }
 
-if (!agencyId) {
-    agencyDescriptionEl.textContent = "Agency not found. Please go back to dashboard and select an agency.";
+if (!productId && !agencyId) {
+    descriptionEl.textContent = "Please go back to the dashboard and select a product.";
     openBriefModalBtn.disabled = true;
 }
 
@@ -38,22 +60,6 @@ function escapeHtml(value) {
         .replace(/'/g, "&#39;");
 }
 
-function normalizeAgencyImageUrl(url) {
-    if (!url) return FALLBACK_IMAGE;
-    try {
-        const imageUrl = new URL(url);
-        if (imageUrl.hostname.includes("images.unsplash.com")) {
-            imageUrl.searchParams.set("w", "1400");
-            imageUrl.searchParams.set("q", "90");
-            imageUrl.searchParams.set("fit", "max");
-            return imageUrl.toString();
-        }
-        return url;
-    } catch {
-        return url;
-    }
-}
-
 function normalizeCampaignStatus(status) {
     const value = String(status || "").trim().toLowerCase();
     if (value === "accepted") return "Accepted";
@@ -61,71 +67,49 @@ function normalizeCampaignStatus(status) {
     return "Pending";
 }
 
-function normalizeCreativeStatus(status) {
-    const value = String(status || "").trim().toLowerCase();
-    if (value === "approved") return "Approved";
-    if (value === "changes requested") return "Changes Requested";
-    return "Pending Review";
-}
-
-function toTimestamp(value) {
-    const time = new Date(value || "").getTime();
-    return Number.isNaN(time) ? 0 : time;
-}
-
-function getLatestCreativeStatuses(creativeAssets) {
-    const latestByKey = new Map();
-    const list = Array.isArray(creativeAssets) ? creativeAssets : [];
-
-    list.forEach((asset) => {
-        const key = String(asset?.fileName || "creative-file").trim().toLowerCase();
-        const existing = latestByKey.get(key);
-        const nextVersion = Number(asset?.version || 1) || 1;
-        const nextTime = toTimestamp(asset?.uploadedAt);
-
-        if (!existing) {
-            latestByKey.set(key, asset);
-            return;
-        }
-
-        const existingVersion = Number(existing?.version || 1) || 1;
-        const existingTime = toTimestamp(existing?.uploadedAt);
-        if (nextVersion > existingVersion || (nextVersion === existingVersion && nextTime >= existingTime)) {
-            latestByKey.set(key, asset);
-        }
-    });
-
-    return Array.from(latestByKey.values()).map((asset) => normalizeCreativeStatus(asset?.reviewStatus));
-}
-
-function getDisplayStatus(campaign) {
-    const campaignStatus = normalizeCampaignStatus(campaign?.status);
-    if (campaignStatus === "Declined") return "Declined";
-    if (campaignStatus !== "Accepted") return "Pending";
-
-    const reviewedStatuses = getLatestCreativeStatuses(campaign?.creativeAssets);
-    if (!reviewedStatuses.length) return "In Progress";
-    if (reviewedStatuses.every((status) => status === "Approved")) return "Approved";
-    if (reviewedStatuses.includes("Changes Requested")) return "Changes Requested";
-    return "In Progress";
-}
-
 function statusClass(status) {
     const normalized = String(status || "").trim().toLowerCase();
     if (normalized === "declined") return "declined";
-    if (normalized === "approved") return "approved";
-    if (normalized === "changes requested") return "changes-requested";
+    if (normalized === "approved" || normalized === "accepted") return "approved";
     if (normalized === "in progress") return "in-progress";
     return "pending";
 }
 
-function openCampaignDetail(campaignId) {
+function productLogoBase(productName) {
+    const normalized = String(productName || "nestle")
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "")
+        .toLowerCase()
+        .replace(/^nestle\s+/, "")
+        .replace(/[^a-z0-9]/g, "");
+    const aliases = {
+        milkmaid: "milkmade"
+    };
+    return aliases[normalized] || normalized || "nestle";
+}
+
+function productLogoUrl(productName, extension = "png") {
+    return `Images/${productLogoBase(productName)}_logoP.${extension}`;
+}
+
+function useNextProductImage(event, productName) {
+    const img = event.currentTarget;
+    const attempts = Number(img.dataset.logoAttempt || 0);
+    const extensions = ["webp", "jpg", "jpeg"];
+    if (attempts < extensions.length) {
+        img.dataset.logoAttempt = String(attempts + 1);
+        img.src = productLogoUrl(productName, extensions[attempts]);
+        return;
+    }
+    img.src = DEFAULT_PRODUCT_IMAGE;
+}
+
+function openCampaignDetail(campaignId, campaignAgencyId) {
     if (!campaignId) return;
     const detailUrl = new URL("campaign_detail.html", window.location.href);
     detailUrl.searchParams.set("campaignId", campaignId);
-    if (agencyId) {
-        detailUrl.searchParams.set("agencyId", agencyId);
-    }
+    if (productId) detailUrl.searchParams.set("productId", productId);
+    if (campaignAgencyId || agencyId) detailUrl.searchParams.set("agencyId", campaignAgencyId || agencyId);
     window.location.href = detailUrl.toString();
 }
 
@@ -134,8 +118,7 @@ function fileToBase64(file) {
         const reader = new FileReader();
         reader.onload = () => {
             const result = String(reader.result || "");
-            const base64 = result.includes(",") ? result.split(",")[1] : "";
-            resolve(base64);
+            resolve(result.includes(",") ? result.split(",")[1] : "");
         };
         reader.onerror = () => reject(new Error("Failed to read file"));
         reader.readAsDataURL(file);
@@ -148,46 +131,79 @@ async function prepareAttachments() {
     if (!files.length) return [];
 
     const totalSize = files.reduce((sum, file) => sum + file.size, 0);
-    const maxBytes = 20 * 1024 * 1024;
-    if (totalSize > maxBytes) {
+    if (totalSize > 20 * 1024 * 1024) {
         throw new Error("Total attachment size must be 20MB or less.");
     }
 
     const attachments = [];
     for (const file of files) {
-        const dataBase64 = await fileToBase64(file);
         attachments.push({
             fileName: file.name,
             mimeType: file.type || "application/octet-stream",
             size: file.size,
-            dataBase64
+            dataBase64: await fileToBase64(file)
         });
     }
-
     return attachments;
 }
 
+function renderProductFacts(product) {
+    const campaignCount = Array.isArray(product.campaigns)
+        ? product.campaigns.length
+        : Number(product.campaignCount || 0);
+    const facts = [
+        ["Product Name", product.name],
+        ["Category", product.category],
+        ["Campaigns", campaignCount]
+    ];
+    productFacts.innerHTML = facts.map(([label, value]) => `
+        <div class="product-fact">
+            <span>${escapeHtml(label)}</span>
+            <strong>${escapeHtml(value || "-")}</strong>
+        </div>
+    `).join("");
+}
+
+async function loadProductInfo() {
+    if (!productId) return;
+    const res = await fetch(`/api/products/${encodeURIComponent(productId)}`);
+    const product = await res.json();
+    if (!res.ok) throw new Error(product.message || "Failed to load product");
+
+    currentProduct = product;
+    document.title = `KOALA by Nestle | ${product.name || "Product"} Campaigns`;
+    pageEyebrow.textContent = "Registered Product";
+    detailsHeading.textContent = "Product Details";
+    detailsHeading.hidden = true;
+    titleEl.textContent = product.name || "Unnamed Product";
+    descriptionEl.textContent = product.category
+        ? `${product.name || "This product"} is registered under ${product.category}.`
+        : "No category recorded.";
+    descriptionEl.hidden = true;
+    heroImageEl.src = productLogoUrl(product.name);
+    heroImageEl.alt = `${product.name || "Product"} image`;
+    heroImageEl.addEventListener("error", (event) => useNextProductImage(event, product.name));
+    campaignSectionTitle.textContent = `${product.name || "Product"} Campaigns`;
+    renderProductFacts(product);
+    renderCampaigns(Array.isArray(product.campaigns) ? product.campaigns : []);
+}
+
 async function loadAgencyInfo() {
-    if (!agencyId) return;
-    try {
-        const res = await fetch(`/api/agencies/${agencyId}`);
-        const agency = await res.json();
+    if (!agencyId || productId) return;
+    const res = await fetch(`/api/agencies/${encodeURIComponent(agencyId)}`);
+    const agency = await res.json();
+    if (!res.ok) throw new Error(agency.message || "Failed to load agency");
 
-        if (!res.ok) throw new Error(agency.message || "Failed to load agency");
-
-        agencyNameEl.textContent = agency.name || "Unnamed Agency";
-        agencyDescriptionEl.textContent = agency.description || "No description available.";
-        agencyImageEl.src = normalizeAgencyImageUrl(agency.imageUrl);
-        agencyImageEl.alt = `${agency.name || "Agency"} image`;
-        agencyImageEl.addEventListener("error", () => {
-            agencyImageEl.src = `/api/media/agency-image?seed=${encodeURIComponent(`agency-brief-${agency._id || agency.name || Date.now()}`)}&name=${encodeURIComponent(agency.name || "Agency")}`;
-        }, { once: true });
-    } catch (err) {
-        console.error(err);
-        agencyNameEl.textContent = "Unnamed Agency";
-        agencyDescriptionEl.textContent = "Error loading agency info.";
-        agencyImageEl.src = FALLBACK_IMAGE;
-    }
+    pageEyebrow.textContent = "Registered Agency";
+    detailsHeading.textContent = "Agency Details";
+    detailsHeading.hidden = false;
+    titleEl.textContent = agency.name || "Unnamed Agency";
+    descriptionEl.textContent = agency.description || "No description available.";
+    descriptionEl.hidden = false;
+    heroImageEl.src = agency.imageUrl || `/api/media/agency-image?seed=${encodeURIComponent(agency._id)}&name=${encodeURIComponent(agency.name || "Agency")}`;
+    campaignSectionTitle.textContent = `${agency.name || "Agency"} Campaigns`;
+    productFacts.innerHTML = "";
+    await loadCampaignsByAgency();
 }
 
 function renderCampaigns(campaigns) {
@@ -196,70 +212,70 @@ function renderCampaigns(campaigns) {
     if (!campaigns.length) {
         const emptyState = document.createElement("div");
         emptyState.className = "empty-campaigns";
-        emptyState.textContent = role === "BrandManager"
-            ? "No ongoing campaigns yet for this agency."
-            : "No ongoing campaigns yet. Create a campaign brief to get started.";
+        emptyState.textContent = productId
+            ? "No campaigns yet for this product. Create a campaign and assign an agency."
+            : "No ongoing campaigns yet for this agency.";
         campaignList.appendChild(emptyState);
         return;
     }
 
     campaigns.forEach(campaign => {
+        const status = normalizeCampaignStatus(campaign.status);
         const card = document.createElement("article");
-        const normalized = getDisplayStatus(campaign);
-        const status = statusClass(normalized);
-        const campaignDecisionStatus = normalizeCampaignStatus(campaign.status);
         card.className = "campaign-card";
-        if (campaign._id) {
-            card.tabIndex = 0;
-            card.setAttribute("role", "button");
-            card.setAttribute("aria-label", `Open ${campaign.title || "campaign"} details`);
-        }
+        card.tabIndex = 0;
+        card.setAttribute("role", "button");
         card.innerHTML = `
             <div class="campaign-card-header">
-                <span class="campaign-status ${escapeHtml(status)}">${escapeHtml(normalized)}</span>
+                <span class="campaign-status ${escapeHtml(statusClass(status))}">${escapeHtml(status)}</span>
             </div>
             <h3>${escapeHtml(campaign.title)}</h3>
+            <p class="campaign-meta">Product: ${escapeHtml(campaign.productName || currentProduct?.name || "-")}</p>
+            <p class="campaign-meta">Agency: ${escapeHtml(campaign.agencyName || "-")}</p>
             <p class="campaign-meta">Timeline: ${escapeHtml(campaign.startDate)} to ${escapeHtml(campaign.endDate)}</p>
             <p class="campaign-meta">Target audience: ${escapeHtml(campaign.targetAudience)}</p>
             <p class="campaign-meta">Budget: ${escapeHtml(campaign.budgetRange)}</p>
-            <p class="campaign-description">${escapeHtml(campaign.description)}</p>
-            <p class="campaign-objectives">Objectives: ${escapeHtml(campaign.objectives)}</p>
-            ${campaignDecisionStatus === "Declined" && campaign.rejectionReason ? `<p class="campaign-rejection-reason"><strong>Reason:</strong> ${escapeHtml(campaign.rejectionReason)}</p>` : ""}
+            <p class="campaign-meta">Campaign type: ${escapeHtml(campaign.campaignType || "-")}</p>
+            <p class="campaign-objectives">Goal: ${escapeHtml(campaign.campaignGoal || campaign.objectives || "-")}</p>
             <div class="campaign-card-footer">
                 <span class="campaign-footer-arrow" aria-hidden="true">&rarr;</span>
             </div>
         `;
-        if (campaign._id) {
-            card.addEventListener("click", () => openCampaignDetail(campaign._id));
-            card.addEventListener("keydown", (event) => {
-                if (event.key === "Enter" || event.key === " ") {
-                    event.preventDefault();
-                    openCampaignDetail(campaign._id);
-                }
-            });
-        }
+        card.addEventListener("click", () => openCampaignDetail(campaign._id, campaign.agencyId));
+        card.addEventListener("keydown", (event) => {
+            if (event.key === "Enter" || event.key === " ") {
+                event.preventDefault();
+                openCampaignDetail(campaign._id, campaign.agencyId);
+            }
+        });
         campaignList.appendChild(card);
     });
 }
 
-async function loadCampaigns() {
+async function loadCampaignsByAgency() {
     if (!agencyId) return;
-    try {
-        const res = await fetch(`/api/campaigns?agencyId=${encodeURIComponent(agencyId)}`);
-        const campaigns = await res.json();
-        const normalizedCampaigns = Array.isArray(campaigns) ? campaigns : [];
-        const visibleCampaigns = role === "BrandManager"
-            ? normalizedCampaigns.filter((campaign) => normalizeCampaignStatus(campaign.status) !== "Declined")
-            : normalizedCampaigns;
-        renderCampaigns(visibleCampaigns);
-    } catch (err) {
-        console.error(err);
-        renderCampaigns([]);
-    }
+    const res = await fetch(`/api/campaigns?agencyId=${encodeURIComponent(agencyId)}`);
+    const campaigns = await res.json();
+    renderCampaigns(Array.isArray(campaigns) ? campaigns : []);
+}
+
+async function loadAgenciesForAssignment() {
+    const res = await fetch("/api/agencies");
+    const agencies = await res.json();
+    allAgencies = Array.isArray(agencies) ? agencies : [];
+    assignedAgencySelect.innerHTML = `<option value="">Select Suitable Agency</option>`;
+    allAgencies.forEach((agency) => {
+        const option = document.createElement("option");
+        option.value = agency._id;
+        option.textContent = agency.name || "Unnamed Agency";
+        assignedAgencySelect.appendChild(option);
+    });
 }
 
 function openBriefModal() {
     campaignBriefModal.style.display = "flex";
+    campaignBriefModal.scrollTop = 0;
+    campaignBriefModal.querySelector(".modal-content")?.scrollTo({ top: 0 });
 }
 
 function closeBriefModal() {
@@ -271,23 +287,27 @@ function closeBriefModal() {
 openBriefModalBtn.addEventListener("click", openBriefModal);
 closeBriefModalBtn.addEventListener("click", closeBriefModal);
 
-campaignBriefForm.addEventListener("submit", async (e) => {
-    e.preventDefault();
+campaignBriefForm.addEventListener("submit", async (event) => {
+    event.preventDefault();
 
+    const selectedAgencyId = assignedAgencySelect.value;
     const campaignData = {
         title: document.getElementById("campaignTitle").value.trim(),
         targetAudience: document.getElementById("targetAudience").value.trim(),
         budgetRange: document.getElementById("budgetRange").value.trim(),
+        campaignType: document.getElementById("campaignType").value.trim(),
         startDate: document.getElementById("startDate").value,
         endDate: document.getElementById("endDate").value,
         description: document.getElementById("campaignDescription").value.trim(),
         objectives: document.getElementById("campaignObjectives").value.trim(),
-        agencyId,
+        productId,
+        productName: currentProduct?.name || "",
+        agencyId: selectedAgencyId,
         mmId
     };
 
-    if (!campaignData.title || !campaignData.agencyId || !campaignData.mmId) {
-        briefFormMessage.textContent = "Missing campaign title or user session. Please log in again.";
+    if (!campaignData.title || !campaignData.productId || !campaignData.agencyId || !campaignData.mmId) {
+        briefFormMessage.textContent = "Missing campaign title, product, agency, or user session.";
         briefFormMessage.className = "form-message error";
         return;
     }
@@ -308,23 +328,35 @@ campaignBriefForm.addEventListener("submit", async (e) => {
         }
 
         closeBriefModal();
-        loadCampaigns();
-        alert(`Campaign brief "${campaignData.title}" created successfully.`);
+        await loadProductInfo();
+        alert(`Campaign "${campaignData.title}" created and assigned successfully.`);
     } catch (err) {
-        console.error(err);
         briefFormMessage.textContent = err?.message || "Error creating campaign";
         briefFormMessage.className = "form-message error";
     }
 });
 
-loadAgencyInfo();
-loadCampaigns();
-
-if (window.initAgencyChat) {
-    window.initAgencyChat({
-        triggerId: "agencyChatTrigger",
-        agencyId,
-        userId,
-        role
-    });
-}
+(async function init() {
+    try {
+        if (agencyChatTrigger && (role === "Agency" || !agencyId || productId)) {
+            agencyChatTrigger.hidden = true;
+        }
+        await loadAgenciesForAssignment();
+        if (productId) {
+            await loadProductInfo();
+        } else {
+            await loadAgencyInfo();
+        }
+        if (window.initAgencyChat && agencyId && !productId) {
+            window.initAgencyChat({
+                triggerId: "agencyChatTrigger",
+                agencyId,
+                userId,
+                role
+            });
+        }
+    } catch (err) {
+        titleEl.textContent = "Workspace unavailable";
+        descriptionEl.textContent = err.message || "Could not load this page.";
+    }
+}());

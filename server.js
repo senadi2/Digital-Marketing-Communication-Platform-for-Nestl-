@@ -1,15 +1,20 @@
 const express = require("express");
 const cors = require("cors");
+const fs = require("fs");
 const path = require("path");
+const { spawn } = require("child_process");
 const bcrypt = require("bcrypt");
+const ffmpegPath = require("ffmpeg-static");
 const { getDb } = require("./firebase");
 
 const USERS_COLLECTION = "users";
 const AGENCIES_COLLECTION = "agencies";
+const PRODUCTS_COLLECTION = "products";
 const CAMPAIGNS_COLLECTION = "campaigns";
 const NOTIFICATIONS_COLLECTION = "notifications";
 const LOGIN_AUDITS_COLLECTION = "loginAudits";
 const AGENCY_CHAT_COLLECTION = "agencyChats";
+const CREATIVE_UPLOAD_DIR = path.join(__dirname, "public", "uploads", "creatives");
 
 const app = express();
 
@@ -33,6 +38,7 @@ const AGENCY_EMAIL_DOMAIN = "@aanestle.com";
 const FAILED_LOGIN_LOG_THRESHOLD = 2;
 const failedLoginAttempts = new Map();
 const ALLOWED_CREATIVE_REVIEW_STATUSES = new Set(["Pending Review", "Approved", "Changes Requested"]);
+const VIDEO_VARIANT_FILL_MODE = "blank-fill";
 
 function requireDb(res) {
     if (db) return true;
@@ -205,21 +211,85 @@ function createId(prefix) {
     return `${prefix}_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`;
 }
 
+function stripUndefined(value) {
+    if (Array.isArray(value)) {
+        return value
+            .map((item) => stripUndefined(item))
+            .filter((item) => item !== undefined);
+    }
+
+    if (value && typeof value === "object") {
+        return Object.entries(value).reduce((cleaned, [key, item]) => {
+            const nextValue = stripUndefined(item);
+            if (nextValue !== undefined) {
+                cleaned[key] = nextValue;
+            }
+            return cleaned;
+        }, {});
+    }
+
+    return value === undefined ? null : value;
+}
+
 function sanitizeStoredFile(file) {
     return {
         fileName: String(file?.fileName || ""),
         mimeType: String(file?.mimeType || "application/octet-stream"),
         size: Number(file?.size || 0),
         dataBase64: String(file?.dataBase64 || ""),
+        fileUrl: String(file?.fileUrl || ""),
+        storagePath: String(file?.storagePath || ""),
         description: String(file?.description || "").trim(),
         component: String(file?.component || "").trim(),
         version: Math.max(1, Number(file?.version || 1) || 1)
     };
 }
 
+function safeUploadFileName(fileName) {
+    const ext = path.extname(String(fileName || "")).slice(0, 16);
+    const base = path.basename(String(fileName || "creative"), ext)
+        .replace(/[<>:"/\\|?*\x00-\x1F]/g, "-")
+        .replace(/\s+/g, "-")
+        .replace(/-+/g, "-")
+        .slice(0, 70) || "creative";
+    return `${base}${ext}`;
+}
+
+function safeGeneratedFileName(fileName) {
+    return safeUploadFileName(fileName)
+        .replace(/\.[^.]+$/, "")
+        .replace(/-+$/g, "") || "creative";
+}
+
+async function storeCreativeUploadFile(campaignId, creativeId, file) {
+    const dataBase64 = String(file?.dataBase64 || "");
+    if (!dataBase64) {
+        return {
+            fileUrl: String(file?.fileUrl || ""),
+            storagePath: String(file?.storagePath || "")
+        };
+    }
+
+    const campaignDir = path.join(CREATIVE_UPLOAD_DIR, String(campaignId));
+    await fs.promises.mkdir(campaignDir, { recursive: true });
+
+    const fileName = `${creativeId}-${safeUploadFileName(file?.fileName)}`;
+    const absolutePath = path.join(campaignDir, fileName);
+    await fs.promises.writeFile(absolutePath, Buffer.from(dataBase64, "base64"));
+
+    return {
+        fileUrl: `/uploads/creatives/${encodeURIComponent(String(campaignId))}/${encodeURIComponent(fileName)}`,
+        storagePath: absolutePath
+    };
+}
+
 function sanitizeCreativeComment(comment, fallback = {}) {
     const message = String(comment?.message || fallback.message || "").trim();
     if (!message) return null;
+    const rawTimestamp = comment?.timestampSeconds ?? fallback.timestampSeconds;
+    const timestampSeconds = rawTimestamp === "" || rawTimestamp === null || rawTimestamp === undefined
+        ? null
+        : Math.max(0, Number(rawTimestamp) || 0);
 
     return {
         id: String(comment?.id || fallback.id || createId("comment")),
@@ -227,8 +297,199 @@ function sanitizeCreativeComment(comment, fallback = {}) {
         authorUserId: String(comment?.authorUserId || fallback.authorUserId || ""),
         authorAgencyId: String(comment?.authorAgencyId || fallback.authorAgencyId || ""),
         message,
+        timestampSeconds,
         createdAt: String(comment?.createdAt || fallback.createdAt || nowIso())
     };
+}
+
+const POST_CREATIVE_VARIANTS = [
+    { channel: "Instagram Feed", width: 1080, height: 1080, aspectRatio: "1:1", format: "PNG" },
+    { channel: "Instagram Story", width: 1080, height: 1920, aspectRatio: "9:16", format: "PNG" },
+    { channel: "Facebook Feed", width: 1080, height: 1080, aspectRatio: "1:1", format: "PNG" },
+    { channel: "Google Ads Landscape", width: 1200, height: 628, aspectRatio: "1.91:1", format: "PNG" },
+    { channel: "Google Ads Square", width: 1200, height: 1200, aspectRatio: "1:1", format: "PNG" },
+    { channel: "LinkedIn Feed Landscape", width: 1200, height: 628, aspectRatio: "1.91:1", format: "PNG" },
+    { channel: "LinkedIn Feed Square", width: 1200, height: 1200, aspectRatio: "1:1", format: "PNG" }
+];
+
+const VIDEO_CREATIVE_VARIANTS = [
+    { channel: "Instagram Reels", width: 1080, height: 1920, aspectRatio: "9:16", format: "MP4/MOV" },
+    { channel: "Instagram Story", width: 1080, height: 1920, aspectRatio: "9:16", format: "MP4/MOV" },
+    { channel: "YouTube Landscape", width: 1920, height: 1080, aspectRatio: "16:9", format: "MP4/MOV" },
+    { channel: "Facebook Video Feed", width: 1080, height: 1080, aspectRatio: "1:1", format: "MP4/MOV" },
+    { channel: "TikTok Vertical", width: 1080, height: 1920, aspectRatio: "9:16", format: "MP4/MOV" }
+];
+
+function normalizeVariantChannel(channel) {
+    const value = String(channel || "");
+    if (value === "Google Display Landscape") return "Google Ads Landscape";
+    if (value === "Google Display Square") return "Google Ads Square";
+    return value;
+}
+
+function isVideoCampaignType(campaign) {
+    return String(campaign?.campaignType || "").trim().toLowerCase() === "video";
+}
+
+function isImageCreativeAsset(creative) {
+    return String(creative?.mimeType || "").toLowerCase().startsWith("image/");
+}
+
+function sanitizeCreativeVariant(variant, fallback = {}) {
+    const width = Math.max(1, Number(variant?.width || fallback.width || 0) || 0);
+    const height = Math.max(1, Number(variant?.height || fallback.height || 0) || 0);
+    if (!width || !height) return null;
+
+    return {
+        id: String(variant?.id || fallback.id || createId("variant")),
+        channel: normalizeVariantChannel(variant?.channel || fallback.channel || "Platform Variant"),
+        width,
+        height,
+        aspectRatio: String(variant?.aspectRatio || fallback.aspectRatio || `${width}:${height}`),
+        format: String(variant?.format || fallback.format || "PNG"),
+        status: String(variant?.status || fallback.status || "Ready"),
+        variantType: String(variant?.variantType || fallback.variantType || "image"),
+        sourceCreativeId: String(variant?.sourceCreativeId || fallback.sourceCreativeId || ""),
+        sourceFileName: String(variant?.sourceFileName || fallback.sourceFileName || ""),
+        sourceFileUrl: String(variant?.sourceFileUrl || fallback.sourceFileUrl || ""),
+        sourceMimeType: String(variant?.sourceMimeType || fallback.sourceMimeType || ""),
+        fileName: String(variant?.fileName || fallback.fileName || ""),
+        fileUrl: String(variant?.fileUrl || fallback.fileUrl || ""),
+        storagePath: String(variant?.storagePath || fallback.storagePath || ""),
+        fillMode: String(variant?.fillMode || fallback.fillMode || ""),
+        generatedAt: String(variant?.generatedAt || fallback.generatedAt || nowIso())
+    };
+}
+
+function buildApprovedCreativeVariants(campaign, creative) {
+    if (!isVideoCampaignType(campaign) && !isImageCreativeAsset(creative)) {
+        return [];
+    }
+
+    const baseVariants = isVideoCampaignType(campaign) ? VIDEO_CREATIVE_VARIANTS : POST_CREATIVE_VARIANTS;
+    const variantType = isVideoCampaignType(campaign) ? "video-spec" : "image";
+    const generatedAt = nowIso();
+
+    return baseVariants.map((variant) => sanitizeCreativeVariant(null, {
+        ...variant,
+        id: createId("variant"),
+        status: "Ready",
+        variantType,
+        fillMode: variantType === "video-spec" ? VIDEO_VARIANT_FILL_MODE : "safe-fit",
+        sourceCreativeId: String(creative?.id || ""),
+        sourceFileName: String(creative?.fileName || ""),
+        sourceFileUrl: String(creative?.fileUrl || ""),
+        sourceMimeType: String(creative?.mimeType || ""),
+        generatedAt
+    })).filter(Boolean);
+}
+
+function runFfmpeg(args) {
+    return new Promise((resolve, reject) => {
+        if (!ffmpegPath) {
+            reject(new Error("FFmpeg binary is unavailable."));
+            return;
+        }
+
+        const child = spawn(ffmpegPath, args, { windowsHide: true });
+        let stderr = "";
+
+        child.stderr.on("data", (chunk) => {
+            stderr += chunk.toString();
+        });
+        child.on("error", reject);
+        child.on("close", (code) => {
+            if (code === 0) {
+                resolve();
+                return;
+            }
+            reject(new Error(stderr || `FFmpeg exited with code ${code}`));
+        });
+    });
+}
+
+async function generateVideoCreativeVariants(campaignId, campaign, creative, variants) {
+    if (!isVideoCampaignType(campaign) || !String(creative?.mimeType || "").toLowerCase().startsWith("video/")) {
+        return variants;
+    }
+
+    const inputPath = String(creative?.storagePath || "");
+    if (!inputPath || !fs.existsSync(inputPath)) {
+        return variants;
+    }
+
+    const variantDir = path.join(CREATIVE_UPLOAD_DIR, String(campaignId), "variants", String(creative.id || "approved"));
+    await fs.promises.mkdir(variantDir, { recursive: true });
+
+    const baseName = safeGeneratedFileName(creative.fileName || "approved-video");
+    const generated = [];
+
+    for (const variant of variants) {
+        const fileName = `${safeUploadFileName(`${baseName}-${variant.channel}-${variant.width}x${variant.height}.mp4`)}`;
+        const outputPath = path.join(variantDir, fileName);
+        const width = Number(variant.width || 0);
+        const height = Number(variant.height || 0);
+        const filter = `scale=${width}:${height}:force_original_aspect_ratio=decrease,pad=${width}:${height}:(ow-iw)/2:(oh-ih)/2:white,setsar=1`;
+
+        await runFfmpeg([
+            "-y",
+            "-i", inputPath,
+            "-vf", filter,
+            "-c:v", "libx264",
+            "-preset", "veryfast",
+            "-crf", "23",
+            "-pix_fmt", "yuv420p",
+            "-c:a", "aac",
+            "-b:a", "128k",
+            "-movflags", "+faststart",
+            outputPath
+        ]);
+
+        generated.push(sanitizeCreativeVariant({
+            ...variant,
+            fileName,
+            fileUrl: `/uploads/creatives/${encodeURIComponent(String(campaignId))}/variants/${encodeURIComponent(String(creative.id || "approved"))}/${encodeURIComponent(fileName)}`,
+            storagePath: outputPath,
+            fillMode: VIDEO_VARIANT_FILL_MODE,
+            status: "Ready"
+        }));
+    }
+
+    return generated;
+}
+
+function approvedVideoNeedsVariantFiles(campaign, creative) {
+    if (!isVideoCampaignType(campaign)) return false;
+    if (String(creative?.reviewStatus || "") !== "Approved") return false;
+    if (!String(creative?.mimeType || "").toLowerCase().startsWith("video/")) return false;
+
+    const variants = Array.isArray(creative?.variants) ? creative.variants : [];
+    if (!variants.length) return true;
+    if (variants.some((variant) => variant.fillMode !== VIDEO_VARIANT_FILL_MODE)) return true;
+    return variants.some((variant) => !variant.fileUrl || !variant.storagePath);
+}
+
+async function ensureApprovedVideoVariantFiles(campaignId, campaign, creativeAssets) {
+    let changed = false;
+    const nextAssets = [];
+
+    for (const creative of creativeAssets) {
+        if (!approvedVideoNeedsVariantFiles(campaign, creative)) {
+            nextAssets.push(creative);
+            continue;
+        }
+
+        const baseVariants = buildApprovedCreativeVariants(campaign, creative);
+        const generatedVariants = await generateVideoCreativeVariants(campaignId, campaign, creative, baseVariants);
+        nextAssets.push({
+            ...creative,
+            variants: generatedVariants
+        });
+        changed = true;
+    }
+
+    if (!changed) return { changed: false, creativeAssets };
+    return { changed: true, creativeAssets: nextAssets };
 }
 
 function sanitizeAgencyChatMessage(message, fallback = {}) {
@@ -333,6 +594,8 @@ function sanitizeCreativeAsset(asset) {
         mimeType: uploadedFile.mimeType,
         size: uploadedFile.size,
         dataBase64: uploadedFile.dataBase64,
+        fileUrl: uploadedFile.fileUrl,
+        storagePath: uploadedFile.storagePath,
         description: uploadedFile.description,
         component: uploadedFile.component,
         version: uploadedFile.version,
@@ -346,6 +609,11 @@ function sanitizeCreativeAsset(asset) {
         comments: Array.isArray(asset?.comments)
             ? asset.comments
                 .map((comment) => sanitizeCreativeComment(comment))
+                .filter(Boolean)
+            : [],
+        variants: Array.isArray(asset?.variants)
+            ? asset.variants
+                .map((variant) => sanitizeCreativeVariant(variant))
                 .filter(Boolean)
             : []
     };
@@ -387,6 +655,104 @@ app.get("/api/media/campaign-image", (req, res) => {
     const title = req.query.title || "Campaign Brief";
     const sig = hashString(`campaign-${seed}-${title}`);
     res.redirect(`https://picsum.photos/seed/campaign-${sig}/1200/700`);
+});
+
+app.post("/api/products", async (req, res) => {
+    try {
+        if (!requireDb(res)) return;
+
+        const {
+            name,
+            category = ""
+        } = req.body;
+
+        const normalizedName = String(name || "").trim();
+        const normalizedCategory = String(category || "").trim();
+        if (!normalizedName || !normalizedCategory) {
+            return res.status(400).json({ message: "Product name and category are required" });
+        }
+
+        const products = await listDocuments(PRODUCTS_COLLECTION);
+        const duplicate = products.find((product) => (
+            String(product.name || "").trim().toLowerCase() === normalizedName.toLowerCase()
+        ));
+        if (duplicate) {
+            return res.status(400).json({ message: "Product is already registered" });
+        }
+
+        const product = await createDocument(PRODUCTS_COLLECTION, {
+            name: normalizedName,
+            category: normalizedCategory
+        });
+
+        res.status(201).json({ message: "Product registered successfully", product });
+    } catch (err) {
+        console.log(err);
+        res.status(500).json({ message: "Error adding product" });
+    }
+});
+
+app.get("/api/products", async (req, res) => {
+    try {
+        if (!requireDb(res)) return;
+
+        const products = await listDocuments(PRODUCTS_COLLECTION);
+        const campaigns = await listDocuments(CAMPAIGNS_COLLECTION);
+        const normalized = products.map((product) => {
+            const productCampaigns = campaigns.filter((campaign) => campaign.productId === product._id);
+            const totalBudget = productCampaigns.reduce((sum, campaign) => {
+                const amount = Number(String(campaign.budgetRange || "").replace(/[^\d.]/g, ""));
+                return Number.isFinite(amount) ? sum + amount : sum;
+            }, 0);
+            return {
+                ...product,
+                campaignCount: productCampaigns.length,
+                activeCampaignCount: productCampaigns.filter((campaign) => normalizeCampaignStatus(campaign.status) !== "Decline").length,
+                totalBudget
+            };
+        });
+
+        res.json(normalized);
+    } catch (err) {
+        console.log(err);
+        res.status(500).json({ message: "Error fetching products" });
+    }
+});
+
+app.get("/api/products/:id", async (req, res) => {
+    try {
+        if (!requireDb(res)) return;
+
+        const product = await getDocumentById(PRODUCTS_COLLECTION, req.params.id);
+        if (!product) return res.status(404).json({ message: "Product not found" });
+
+        const campaigns = (await listDocuments(CAMPAIGNS_COLLECTION))
+            .filter((campaign) => campaign.productId === String(product._id || ""));
+        const agencies = await listDocuments(AGENCIES_COLLECTION);
+        const agencyIds = new Set(campaigns.map((campaign) => campaign.agencyId).filter(Boolean));
+        const productAgencies = agencies.filter((agency) => agencyIds.has(agency._id));
+
+        res.json({
+            ...product,
+            campaigns: campaigns.map((campaign) => ({
+                ...campaign,
+                status: normalizeCampaignStatus(campaign.status),
+                agencyName: agencies.find((agency) => agency._id === campaign.agencyId)?.name || ""
+            })),
+            agencies: productAgencies,
+            performance: {
+                totalCampaigns: campaigns.length,
+                activeCampaigns: campaigns.filter((campaign) => normalizeCampaignStatus(campaign.status) !== "Decline").length,
+                totalBudget: campaigns.reduce((sum, campaign) => {
+                    const amount = Number(String(campaign.budgetRange || "").replace(/[^\d.]/g, ""));
+                    return Number.isFinite(amount) ? sum + amount : sum;
+                }, 0)
+            }
+        });
+    } catch (err) {
+        console.log(err);
+        res.status(500).json({ message: "Error fetching product" });
+    }
 });
 
 app.post("/api/login", async (req, res) => {
@@ -625,13 +991,22 @@ app.post("/api/campaigns", async (req, res) => {
             description = "",
             objectives = "",
             attachments = [],
+            productId,
+            productName = "",
+            campaignGoal = "",
+            campaignType = "",
+            platforms = "",
+            expectedKpi = "",
             agencyId,
             mmId
         } = req.body;
 
-        if (!title || !agencyId || !mmId) {
-            return res.status(400).json({ message: "title, agencyId and mmId are required" });
+        if (!title || !productId || !agencyId || !mmId) {
+            return res.status(400).json({ message: "title, productId, agencyId and mmId are required" });
         }
+
+        const product = await getDocumentById(PRODUCTS_COLLECTION, productId);
+        if (!product) return res.status(404).json({ message: "Product not found" });
 
         const agency = await getDocumentById(AGENCIES_COLLECTION, agencyId);
         if (!agency) return res.status(404).json({ message: "Agency not found" });
@@ -644,6 +1019,12 @@ app.post("/api/campaigns", async (req, res) => {
             endDate,
             description,
             objectives,
+            productId,
+            productName: productName || product.name || "",
+            campaignGoal,
+            campaignType,
+            platforms,
+            expectedKpi,
             attachments: Array.isArray(attachments) ? attachments.map((file) => ({
                 fileName: String(file.fileName || ""),
                 mimeType: String(file.mimeType || "application/octet-stream"),
@@ -661,9 +1042,11 @@ app.post("/api/campaigns", async (req, res) => {
             userId: String(agency._id || ""),
             fromUserId: mmId,
             type: "campaign_request",
-            message: `Campaign "${campaign.title}" has been assigned to your agency.`,
+            message: `Campaign "${campaign.title}" for ${product.name || "a product"} has been assigned to your agency.`,
             campaignId: String(campaign._id || ""),
             campaignTitle: campaign.title,
+            productId: String(product._id || ""),
+            productName: product.name || "",
             status: "Pending"
         });
 
@@ -678,10 +1061,11 @@ app.get("/api/campaigns", async (req, res) => {
     try {
         if (!requireDb(res)) return;
 
-        const { agencyId, status } = req.query;
+        const { agencyId, productId, status } = req.query;
         const campaigns = await listDocuments(CAMPAIGNS_COLLECTION);
         const filters = campaigns.filter((campaign) => {
             if (agencyId && campaign.agencyId !== agencyId) return false;
+            if (productId && campaign.productId !== productId) return false;
             if (status && campaign.status !== normalizeCampaignStatus(status)) return false;
             return true;
         });
@@ -716,9 +1100,17 @@ app.get("/api/campaigns/:id", async (req, res) => {
 
         const json = { ...campaign };
         json.status = normalizeCampaignStatus(json.status);
-        json.creativeAssets = Array.isArray(json.creativeAssets)
+        let creativeAssets = Array.isArray(json.creativeAssets)
             ? json.creativeAssets.map((asset) => sanitizeCreativeAsset(asset))
             : [];
+        const repaired = await ensureApprovedVideoVariantFiles(req.params.id, json, creativeAssets);
+        if (repaired.changed) {
+            await updateDocument(CAMPAIGNS_COLLECTION, req.params.id, {
+                creativeAssets: stripUndefined(repaired.creativeAssets)
+            });
+            creativeAssets = repaired.creativeAssets;
+        }
+        json.creativeAssets = creativeAssets;
         res.json(json);
     } catch (err) {
         console.log(err);
@@ -834,24 +1226,50 @@ app.post("/api/campaigns/:id/creatives", async (req, res) => {
             return res.status(400).json({ message: "At least one creative file is required" });
         }
 
+        const isVideoCampaign = String(campaign.campaignType || "").trim().toLowerCase() === "video";
+        const hasInvalidFileType = files.some((file) => {
+            const mimeType = String(file?.mimeType || "").toLowerCase();
+            return isVideoCampaign ? !mimeType.startsWith("video/") : mimeType.startsWith("video/");
+        });
+        if (hasInvalidFileType) {
+            return res.status(400).json({
+                message: isVideoCampaign
+                    ? "Video campaigns only accept video creative files."
+                    : "Post campaigns only accept non-video creative files."
+            });
+        }
+
         const existingCreatives = Array.isArray(campaign.creativeAssets) ? campaign.creativeAssets.map(sanitizeCreativeAsset) : [];
-        const hasApprovedCreative = existingCreatives.some((asset) => String(asset.reviewStatus || "").trim().toLowerCase() === "approved");
+        const migratedExistingCreatives = await Promise.all(existingCreatives.map(async (asset) => {
+            if (!asset.dataBase64 || asset.fileUrl) return asset;
+            const storedFile = await storeCreativeUploadFile(req.params.id, asset.id, asset);
+            return {
+                ...asset,
+                dataBase64: "",
+                ...storedFile
+            };
+        }));
+        const hasApprovedCreative = migratedExistingCreatives.some((asset) => String(asset.reviewStatus || "").trim().toLowerCase() === "approved");
         if (hasApprovedCreative) {
             return res.status(400).json({ message: "Creative uploads are locked after approval." });
         }
 
         function getCreativeVersion() {
-            if (!existingCreatives.length) return 1;
-            const highest = existingCreatives.reduce((max, asset) => {
+            if (!migratedExistingCreatives.length) return 1;
+            const highest = migratedExistingCreatives.reduce((max, asset) => {
                 const value = Number(asset.version || 1);
                 return Number.isFinite(value) && value > max ? value : max;
             }, 1);
             return highest + 1;
         }
-        const nextCreatives = existingCreatives.concat(
-            files.map((file) => sanitizeCreativeAsset({
+        const uploadedCreatives = await Promise.all(files.map(async (file) => {
+            const creativeId = createId("creative");
+            const storedFile = await storeCreativeUploadFile(req.params.id, creativeId, file);
+            return sanitizeCreativeAsset({
                 ...file,
-                id: createId("creative"),
+                id: creativeId,
+                dataBase64: "",
+                ...storedFile,
                 version: getCreativeVersion(),
                 uploadedByAgencyId: agencyId,
                 uploadedAt: nowIso(),
@@ -859,11 +1277,12 @@ app.post("/api/campaigns/:id/creatives", async (req, res) => {
                 reviewedAt: "",
                 reviewedByUserId: "",
                 comments: []
-            }))
-        );
+            });
+        }));
+        const nextCreatives = migratedExistingCreatives.concat(uploadedCreatives);
 
         const updatedCampaign = await updateDocument(CAMPAIGNS_COLLECTION, req.params.id, {
-            creativeAssets: nextCreatives
+            creativeAssets: stripUndefined(nextCreatives)
         });
 
         const brandManagers = await findUsersByRole("BrandManager");
@@ -907,7 +1326,7 @@ app.post("/api/campaigns/:id/creatives/:creativeId/comments", async (req, res) =
     try {
         if (!requireDb(res)) return;
 
-        const { userId, role, agencyId = "", message } = req.body;
+        const { userId, role, agencyId = "", message, timestampSeconds = null } = req.body;
         const user = await findUserById(userId);
         if (!user || user.role !== role) {
             return res.status(403).json({ message: "You are not allowed to comment on this creative" });
@@ -939,7 +1358,8 @@ app.post("/api/campaigns/:id/creatives/:creativeId/comments", async (req, res) =
             authorRole: role,
             authorUserId: userId,
             authorAgencyId: role === "Agency" ? agencyId : "",
-            message: normalizedMessage
+            message: normalizedMessage,
+            timestampSeconds
         });
 
         creativeAssets[creativeIndex] = {
@@ -948,7 +1368,7 @@ app.post("/api/campaigns/:id/creatives/:creativeId/comments", async (req, res) =
         };
 
         const updatedCampaign = await updateDocument(CAMPAIGNS_COLLECTION, req.params.id, {
-            creativeAssets
+            creativeAssets: stripUndefined(creativeAssets)
         });
 
         if (role === "BrandManager" || role === "MarketingManager") {
@@ -1070,18 +1490,32 @@ app.patch("/api/campaigns/:id/creatives/:creativeId/review", async (req, res) =>
             });
         }
 
+        let approvedVariants = [];
+        if (nextStatus === "Approved") {
+            approvedVariants = buildApprovedCreativeVariants(campaign, creativeAssets[creativeIndex]);
+            approvedVariants = await generateVideoCreativeVariants(
+                req.params.id,
+                campaign,
+                creativeAssets[creativeIndex],
+                approvedVariants
+            );
+        }
+
         creativeAssets[creativeIndex] = {
             ...creativeAssets[creativeIndex],
             reviewStatus: nextStatus,
             reviewedAt: nowIso(),
             reviewedByUserId: userId,
+            variants: nextStatus === "Approved"
+                ? approvedVariants
+                : [],
             comments: reviewComment
                 ? [...creativeAssets[creativeIndex].comments, reviewComment]
                 : creativeAssets[creativeIndex].comments
         };
 
         const updatedCampaign = await updateDocument(CAMPAIGNS_COLLECTION, req.params.id, {
-            creativeAssets
+            creativeAssets: stripUndefined(creativeAssets)
         });
 
         await createDocument(NOTIFICATIONS_COLLECTION, {
@@ -1195,8 +1629,23 @@ app.patch("/api/notifications/read-all", async (req, res) => {
     }
 });
 
-app.listen(3000, () => {
-    console.log("Server running on http://localhost:3000");
+const PORT = Number(process.env.PORT || 3000);
+
+const server = app.listen(PORT);
+
+server.once("listening", () => {
+    console.log(`Server running on http://localhost:${PORT}`);
+});
+
+server.once("error", (err) => {
+    if (err.code === "EADDRINUSE") {
+        console.error(`Port ${PORT} is already in use. Stop the other process or start this server with a different PORT.`);
+        process.exitCode = 1;
+        return;
+    }
+
+    console.error("Server failed to start:", err.message || err);
+    process.exitCode = 1;
 });
 
 

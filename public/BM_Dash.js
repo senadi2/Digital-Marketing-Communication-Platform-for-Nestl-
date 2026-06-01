@@ -8,7 +8,19 @@ const notificationList = document.getElementById("notificationList");
 const notificationCount = document.getElementById("notificationCount");
 const clearAllNotificationsBtn = document.getElementById("clearAllNotificationsBtn");
 
-const DEFAULT_IMAGE = "/api/media/agency-image?seed=default&name=Agency";
+const AGENCY_IMAGE_FILES = [
+    "agency1.jpg",
+    "agency2.avif",
+    "agency3.avif",
+    "agency4.avif",
+    "agency5.avif",
+    "agency6.avif",
+    "agency7.avif",
+    "agency8.avif",
+    "agency9.avif",
+    "agency10.avif"
+];
+const DEFAULT_IMAGE = "Images/agency_images/agency1.jpg";
 const DEFAULT_PRODUCT_IMAGE = "Images/logo_nobackground.png";
 const brandManagerUserId = localStorage.getItem("userId") || "";
 let allProducts = [];
@@ -33,8 +45,9 @@ function escapeHtml(value) {
         .replace(/'/g, "&#39;");
 }
 
-function getUniqueFallbackImage(seedValue) {
-    return `/api/media/agency-image?seed=${encodeURIComponent(seedValue)}&name=${encodeURIComponent("Agency Partner")}`;
+function agencyImage(index) {
+    const safeIndex = Math.max(0, Number(index || 0));
+    return `Images/agency_images/${AGENCY_IMAGE_FILES[safeIndex % AGENCY_IMAGE_FILES.length]}`;
 }
 
 function productLogoBase(productName) {
@@ -67,16 +80,10 @@ function useNextProductImage(event, productName) {
 }
 
 function hydrateAgencyImages(agencies) {
-    const used = new Set();
-
-    return agencies.map((agency) => {
-        let resolvedUrl = agency.imageUrl || "";
-        if (!resolvedUrl || used.has(resolvedUrl)) {
-            resolvedUrl = getUniqueFallbackImage(`agency-${agency.name}-${agency._id || Date.now()}`);
-        }
-        used.add(resolvedUrl);
-        return { ...agency, displayImageUrl: resolvedUrl };
-    });
+    return agencies.map((agency, index) => ({
+        ...agency,
+        displayImageUrl: agencyImage(index)
+    }));
 }
 
 function createAgencyCard(agency) {
@@ -87,7 +94,7 @@ function createAgencyCard(agency) {
     img.src = agency.displayImageUrl || agency.imageUrl || DEFAULT_IMAGE;
     img.alt = agency.name;
     img.addEventListener("error", () => {
-        img.src = getUniqueFallbackImage(`agency-img-${agency._id || agency.name || Date.now()}`);
+        img.src = DEFAULT_IMAGE;
     }, { once: true });
 
     const name = document.createElement("h3");

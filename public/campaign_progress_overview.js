@@ -1,15 +1,32 @@
 const role = localStorage.getItem("role") || "";
 const userId = localStorage.getItem("userId") || "";
 
-const summaryStats = document.getElementById("summaryStats");
 const statusBars = document.getElementById("statusBars");
-const actionList = document.getElementById("actionList");
 const campaignTableBody = document.getElementById("campaignTableBody");
-const updatedAt = document.getElementById("updatedAt");
+const campaignTableHeadRow = document.getElementById("campaignTableHeadRow");
 const filterButtons = document.querySelectorAll(".filter-btn");
+const productPerformanceChartEl = document.getElementById("productPerformanceChart");
+const performanceChartEmpty = document.getElementById("performanceChartEmpty");
+const analyticsYearEl = document.getElementById("analyticsYear");
+const previousYearBtn = document.getElementById("previousYearBtn");
+const nextYearBtn = document.getElementById("nextYearBtn");
 
 let campaigns = [];
 let activeFilter = "All";
+let productPerformanceChart = null;
+let selectedAnalyticsYear = new Date().getFullYear();
+
+const MONTH_LABELS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+const PRODUCT_COLORS = [
+    "#003a8f",
+    "#177245",
+    "#d99a18",
+    "#b42318",
+    "#7a2fb8",
+    "#008c95",
+    "#d14900",
+    "#475467"
+];
 
 if (role && role !== "MarketingManager") {
     window.location.href = role === "BrandManager" ? "BM_dash.html" : "AA_DASH.html";
@@ -154,6 +171,57 @@ function formatTimeline(campaign) {
     return `${start} - ${end}`;
 }
 
+function campaignMonthIndex(campaign) {
+    const timestamp = toTimestamp(campaign.endDate) || toTimestamp(campaign.startDate) || toTimestamp(campaign.createdAt);
+    if (!timestamp) return -1;
+    return new Date(timestamp).getMonth();
+}
+
+function campaignYear(campaign) {
+    const timestamp = toTimestamp(campaign.endDate) || toTimestamp(campaign.startDate) || toTimestamp(campaign.createdAt);
+    if (!timestamp) return null;
+    return new Date(timestamp).getFullYear();
+}
+
+function objectiveRate(value) {
+    const normalized = String(value || "").trim().toLowerCase();
+    if (normalized === "yes") return 100;
+    if (normalized === "partial") return 50;
+    if (normalized === "no") return 0;
+    return null;
+}
+
+function campaignSuccessRate(campaign) {
+    const metrics = campaign?.successMetrics || {};
+    const targetReached = Number(metrics.targetReached);
+    const actualReached = Number(metrics.actualReached);
+    const objective = objectiveRate(metrics.objectiveAchieved);
+
+    if (!Number.isFinite(targetReached) || targetReached <= 0) return null;
+    if (!Number.isFinite(actualReached) || actualReached < 0) return null;
+    if (objective === null) return null;
+
+    const reachRate = (actualReached / targetReached) * 100;
+    const successRate = (reachRate + objective) / 2;
+    return Math.max(0, Math.min(100, successRate));
+}
+
+function successRateClass(rate) {
+    if (rate === null) return "empty";
+    if (rate >= 90) return "green";
+    if (rate >= 70) return "yellow";
+    if (rate >= 50) return "orange";
+    return "red";
+}
+
+function formatSuccessRate(rate) {
+    return rate === null ? "Not entered" : `${rate.toFixed(1)}%`;
+}
+
+function displayStatus(status) {
+    return status === "Pending" ? "To-Be-Accepted" : status;
+}
+
 function openCampaign(campaign) {
     if (!campaign?._id) return;
     const url = new URL("campaign_detail.html", window.location.href);
@@ -187,30 +255,10 @@ function countByStatus(list) {
 }
 
 function renderSummary() {
-    const total = campaigns.length;
-    const statusCounts = countByStatus(campaigns);
-    const accepted = campaigns.filter((campaign) => normalizeCampaignStatus(campaign.status) === "Accepted").length;
-    const awaitingReview = campaigns.filter((campaign) => {
-        const health = campaignHealth(campaign);
-        return health.status === "In Progress" || health.status === "Changes Requested";
-    }).length;
+}
 
-    updatedAt.textContent = `Updated ${new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}`;
-
-    const cards = [
-        ["fa-layer-group", total, "Total Campaigns"],
-        ["fa-circle-check", statusCounts.Approved || 0, "Approved Campaigns"],
-        ["fa-spinner", awaitingReview, "In Review / Progress"],
-        ["fa-handshake", accepted, "Agency Accepted"]
-    ];
-
-    summaryStats.innerHTML = cards.map(([icon, value, label]) => `
-        <article class="summary-card">
-            <i class="fa-solid ${icon}" aria-hidden="true"></i>
-            <strong>${escapeHtml(value)}</strong>
-            <span>${escapeHtml(label)}</span>
-        </article>
-    `).join("");
+function renderAnalyticsYear() {
+    if (analyticsYearEl) analyticsYearEl.textContent = String(selectedAnalyticsYear);
 }
 
 function renderStatusBars() {
@@ -221,9 +269,10 @@ function renderStatusBars() {
     statusBars.innerHTML = labels.map((label) => {
         const count = counts[label] || 0;
         const percent = Math.round((count / total) * 100);
+        const displayLabel = label === "Pending" ? "To-Be-Accepted" : label;
         return `
             <div class="status-row">
-                <span>${escapeHtml(label)}</span>
+                <span>${escapeHtml(displayLabel)}</span>
                 <div class="bar-track" aria-hidden="true">
                     <div class="bar-fill ${escapeHtml(statusClass(label))}" style="width:${percent}%"></div>
                 </div>
@@ -233,55 +282,193 @@ function renderStatusBars() {
     }).join("");
 }
 
-function renderActions() {
-    const priority = campaigns
-        .map((campaign) => ({ campaign, health: campaignHealth(campaign) }))
-        .filter((item) => item.health.status !== "Approved" && item.health.status !== "Declined")
-        .slice(0, 5);
+function buildPerformanceDatasets() {
+    const productMonthMap = new Map();
 
-    if (!priority.length) {
-        actionList.innerHTML = `<div class="empty-state">No campaigns need immediate follow-up.</div>`;
+    campaigns.forEach((campaign) => {
+        const successRate = campaignSuccessRate(campaign);
+        const monthIndex = campaignMonthIndex(campaign);
+        const year = campaignYear(campaign);
+        const productName = String(campaign.productName || "Unassigned Product").trim() || "Unassigned Product";
+
+        if (successRate === null || monthIndex < 0 || year !== selectedAnalyticsYear) return;
+
+        if (!productMonthMap.has(productName)) {
+            productMonthMap.set(productName, MONTH_LABELS.map(() => ({ total: 0, count: 0 })));
+        }
+
+        const bucket = productMonthMap.get(productName)[monthIndex];
+        bucket.total += successRate;
+        bucket.count += 1;
+    });
+
+    return Array.from(productMonthMap.entries())
+        .sort(([a], [b]) => a.localeCompare(b))
+        .map(([productName, monthBuckets], index) => {
+            const color = PRODUCT_COLORS[index % PRODUCT_COLORS.length];
+            const counts = monthBuckets.map((bucket) => bucket.count);
+
+            return {
+                label: productName,
+                data: monthBuckets.map((bucket) => (
+                    bucket.count ? Number((bucket.total / bucket.count).toFixed(1)) : null
+                )),
+                monthlyCounts: counts,
+                borderColor: color,
+                backgroundColor: color,
+                pointBackgroundColor: color,
+                pointBorderColor: color,
+                pointBorderWidth: 1,
+                pointRadius: 3,
+                pointHoverRadius: 5,
+                borderWidth: 3,
+                tension: 0.28,
+                spanGaps: true,
+                clip: false
+            };
+        });
+}
+
+function renderPerformanceChart() {
+    if (!productPerformanceChartEl || typeof Chart === "undefined") {
+        if (performanceChartEmpty) {
+            performanceChartEmpty.hidden = false;
+            performanceChartEmpty.textContent = "Performance chart is unavailable.";
+        }
         return;
     }
 
-    actionList.innerHTML = "";
-    priority.forEach(({ campaign, health }) => {
-        const item = document.createElement("div");
-        item.className = "action-item";
-        item.tabIndex = 0;
-        item.setAttribute("role", "button");
-        item.innerHTML = `
-            <div>
-                <strong>${escapeHtml(campaign.title || "Untitled Campaign")}</strong>
-                <span>${escapeHtml(health.nextAction)}</span>
-            </div>
-            <small>${escapeHtml(campaign.agencyName || "-")}</small>
-        `;
-        item.addEventListener("click", () => openCampaign(campaign));
-        item.addEventListener("keydown", (event) => {
-            if (event.key === "Enter" || event.key === " ") {
-                event.preventDefault();
-                openCampaign(campaign);
+    const datasets = buildPerformanceDatasets();
+    const hasData = datasets.some((dataset) => dataset.data.some((value) => value !== null));
+
+    if (performanceChartEmpty) {
+        performanceChartEmpty.hidden = true;
+        performanceChartEmpty.textContent = "";
+    }
+
+    if (productPerformanceChart) {
+        productPerformanceChart.destroy();
+    }
+
+    productPerformanceChart = new Chart(productPerformanceChartEl, {
+        type: "line",
+        data: {
+            labels: MONTH_LABELS,
+            datasets
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            interaction: {
+                mode: "nearest",
+                intersect: false
+            },
+            plugins: {
+                legend: {
+                    position: "bottom",
+                    labels: {
+                        usePointStyle: true,
+                        boxWidth: 8,
+                        color: "#342020",
+                        font: {
+                            size: 12,
+                            weight: "700"
+                        }
+                    }
+                },
+                tooltip: {
+                    callbacks: {
+                        label(context) {
+                            const count = context.dataset.monthlyCounts?.[context.dataIndex] || 0;
+                            const value = Number(context.parsed.y || 0).toFixed(1);
+                            const campaignLabel = count === 1 ? "campaign" : "campaigns";
+                            return `${context.dataset.label}: ${value}% (${count} ${campaignLabel})`;
+                        }
+                    }
+                }
+            },
+            scales: {
+                x: {
+                    grid: {
+                        display: false
+                    },
+                    ticks: {
+                        color: "#5f5b5b",
+                        font: {
+                            weight: "700"
+                        }
+                    }
+                },
+                y: {
+                    min: 0,
+                    max: 100,
+                    ticks: {
+                        stepSize: 20,
+                        color: "#5f5b5b",
+                        callback(value) {
+                            return `${value}%`;
+                        }
+                    },
+                    title: {
+                        display: true,
+                        text: "Success Rate",
+                        color: "#5f5b5b",
+                        font: {
+                            weight: "700"
+                        }
+                    },
+                    grid: {
+                        color: "rgba(215, 224, 236, 0.85)"
+                    }
+                }
             }
-        });
-        actionList.appendChild(item);
+        }
     });
 }
 
+function showSuccessRateColumn() {
+    return activeFilter === "Approved";
+}
+
+function showStatusColumn() {
+    return activeFilter === "All";
+}
+
+function renderCampaignTableHeader() {
+    if (!campaignTableHeadRow) return;
+    const table = campaignTableHeadRow.closest("table");
+    table?.classList.toggle("has-status-column", showStatusColumn());
+    table?.classList.toggle("has-success-column", showSuccessRateColumn());
+
+    campaignTableHeadRow.innerHTML = `
+        <th>Campaign</th>
+        <th>Product</th>
+        <th>Agency</th>
+        ${showStatusColumn() ? '<th class="status-column">Status</th>' : ""}
+        ${showSuccessRateColumn() ? '<th class="success-column">Success Rate</th>' : ""}
+        <th>Timeline</th>
+    `;
+}
+
 function renderCampaignTable() {
+    renderCampaignTableHeader();
+
     const visibleCampaigns = campaigns.filter((campaign) => {
         if (activeFilter === "All") return true;
         return campaignHealth(campaign).status === activeFilter;
     });
 
+    const columnCount = 4 + (showStatusColumn() ? 1 : 0) + (showSuccessRateColumn() ? 1 : 0);
+
     if (!visibleCampaigns.length) {
-        campaignTableBody.innerHTML = `<tr><td colspan="7"><div class="empty-state">No campaigns found for this view.</div></td></tr>`;
+        campaignTableBody.innerHTML = `<tr><td colspan="${columnCount}"><div class="empty-state">No campaigns found for this view.</div></td></tr>`;
         return;
     }
 
     campaignTableBody.innerHTML = "";
     visibleCampaigns.forEach((campaign) => {
         const health = campaignHealth(campaign);
+        const successRate = campaignSuccessRate(campaign);
         const row = document.createElement("tr");
         row.className = "campaign-row";
         row.innerHTML = `
@@ -293,21 +480,10 @@ function renderCampaignTable() {
             </td>
             <td>${escapeHtml(campaign.productName || "-")}</td>
             <td>${escapeHtml(campaign.agencyName || "-")}</td>
-            <td><span class="status-pill ${escapeHtml(statusClass(health.status))}">${escapeHtml(health.status)}</span></td>
-            <td>
-                <div class="approval-stack">
-                    <span>${escapeHtml(health.approvals)}</span>
-                    <span>${escapeHtml(health.nextAction)}</span>
-                </div>
-            </td>
-            <td>
-                <div class="progress-cell">
-                    <div class="progress-track" aria-hidden="true">
-                        <div class="progress-fill" style="width:${health.progress}%"></div>
-                    </div>
-                    <span class="muted-cell">${health.progress}%</span>
-                </div>
-            </td>
+            ${showStatusColumn() ? `<td class="status-column"><span class="status-pill ${escapeHtml(statusClass(health.status))}">${escapeHtml(displayStatus(health.status))}</span></td>` : ""}
+            ${showSuccessRateColumn() ? `<td class="success-column">
+                <span class="success-rate-pill ${escapeHtml(successRateClass(successRate))}">${escapeHtml(formatSuccessRate(successRate))}</span>
+            </td>` : ""}
             <td class="muted-cell">${escapeHtml(formatTimeline(campaign))}</td>
         `;
         row.addEventListener("click", () => openCampaign(campaign));
@@ -317,8 +493,9 @@ function renderCampaignTable() {
 
 function renderPage() {
     renderSummary();
+    renderAnalyticsYear();
     renderStatusBars();
-    renderActions();
+    renderPerformanceChart();
     renderCampaignTable();
 }
 
@@ -344,10 +521,9 @@ async function loadOverview() {
         );
         renderPage();
     } catch (err) {
-        campaignTableBody.innerHTML = `<tr><td colspan="7"><div class="empty-state">${escapeHtml(err.message || "Could not load campaign overview.")}</div></td></tr>`;
-        summaryStats.innerHTML = "";
+        campaignTableBody.innerHTML = `<tr><td colspan="5"><div class="empty-state">${escapeHtml(err.message || "Could not load campaign overview.")}</div></td></tr>`;
         statusBars.innerHTML = "";
-        actionList.innerHTML = `<div class="empty-state">Overview unavailable.</div>`;
+        if (performanceChartEmpty) performanceChartEmpty.hidden = false;
     }
 }
 
@@ -357,6 +533,18 @@ filterButtons.forEach((button) => {
         filterButtons.forEach((item) => item.classList.toggle("active", item === button));
         renderCampaignTable();
     });
+});
+
+previousYearBtn?.addEventListener("click", () => {
+    selectedAnalyticsYear -= 1;
+    renderAnalyticsYear();
+    renderPerformanceChart();
+});
+
+nextYearBtn?.addEventListener("click", () => {
+    selectedAnalyticsYear += 1;
+    renderAnalyticsYear();
+    renderPerformanceChart();
 });
 
 window.logout = () => {

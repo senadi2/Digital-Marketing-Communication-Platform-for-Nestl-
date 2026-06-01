@@ -12,7 +12,19 @@ const notificationList = document.getElementById("notificationList");
 const notificationCount = document.getElementById("notificationCount");
 const clearAllNotificationsBtn = document.getElementById("clearAllNotificationsBtn");
 
-const DEFAULT_AGENCY_IMAGE = "/api/media/agency-image?seed=default&name=Agency";
+const AGENCY_IMAGE_FILES = [
+    "agency1.jpg",
+    "agency2.avif",
+    "agency3.avif",
+    "agency4.avif",
+    "agency5.avif",
+    "agency6.avif",
+    "agency7.avif",
+    "agency8.avif",
+    "agency9.avif",
+    "agency10.avif"
+];
+const DEFAULT_AGENCY_IMAGE = "Images/agency_images/agency1.jpg";
 const DEFAULT_PRODUCT_IMAGE = "Images/logo_nobackground.png";
 const mmUserId = localStorage.getItem("userId") || "";
 const AGENCY_EMAIL_DOMAIN = "@aanestle.com";
@@ -66,8 +78,9 @@ function useNextProductImage(event, productName) {
     img.src = DEFAULT_PRODUCT_IMAGE;
 }
 
-function agencyImage(agency) {
-    return agency.imageUrl || `/api/media/agency-image?seed=${encodeURIComponent(agency._id || agency.name || Date.now())}&name=${encodeURIComponent(agency.name || "Agency")}`;
+function agencyImage(index) {
+    const safeIndex = Math.max(0, Number(index || 0));
+    return `Images/agency_images/${AGENCY_IMAGE_FILES[safeIndex % AGENCY_IMAGE_FILES.length]}`;
 }
 
 function createProductCard(product) {
@@ -89,7 +102,7 @@ function createAgencyCard(agency) {
     const card = document.createElement("div");
     card.className = "agency-card";
     card.innerHTML = `
-        <img src="${escapeHtml(agencyImage(agency) || DEFAULT_AGENCY_IMAGE)}" alt="${escapeHtml(agency.name || "Agency")}">
+        <img src="${escapeHtml(agency.displayImageUrl || DEFAULT_AGENCY_IMAGE)}" alt="${escapeHtml(agency.name || "Agency")}">
         <h3>${escapeHtml(agency.name || "Unnamed Agency")}</h3>
         <p class="card-meta">${escapeHtml(agency.description || "Agency partner")}</p>
     `;
@@ -137,7 +150,10 @@ async function loadAgencies() {
     try {
         const res = await fetch("/api/agencies");
         const agencies = await res.json();
-        allAgencies = Array.isArray(agencies) ? agencies : [];
+        allAgencies = (Array.isArray(agencies) ? agencies : []).map((agency, index) => ({
+            ...agency,
+            displayImageUrl: agencyImage(index)
+        }));
         agencyList.innerHTML = "";
         currentAgencyIndex = 0;
         showMoreAgencies();

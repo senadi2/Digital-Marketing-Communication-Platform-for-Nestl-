@@ -47,44 +47,40 @@
       </div>
     </div>
 
-    <section class="feedback-header">
-      <div>
-        <h1>Agency Feedback & Performance</h1>
-        <p>Track recurring manager feedback, improvement tips, and your agency score in one focused view.</p>
+    <section class="feedback-panel agency-performance-panel">
+      <div class="panel-heading agency-performance-heading">
+        <div>
+          <h2>My Agency Performance</h2>
+        </div>
+        <div class="performance-controls">
+          <div class="year-control" aria-label="Agency performance year">
+            <button type="button" id="agencyScorePrevYear" aria-label="Previous year">&lt;</button>
+            <span id="agencyScoreYear">2026</span>
+            <button type="button" id="agencyScoreNextYear" aria-label="Next year">&gt;</button>
+          </div>
+        </div>
       </div>
-      <p id="updatedAt">Loading...</p>
+      <div class="current-agency-score" id="currentAgencyScore">Performance Score: -</div>
+      <div class="agency-chart-shell" id="agencyChartShell">
+        <canvas id="agencyPerformanceChart" aria-label="Monthly agency score from January to December" role="img"></canvas>
+        <div class="agency-chart-tooltip" id="agencyChartTooltip" hidden></div>
+      </div>
     </section>
 
-    <section class="feedback-layout">
+    <section class="feedback-layout feedback-layout-single">
       <article class="feedback-panel themes-panel">
         <div class="panel-heading">
           <div>
-            <p class="section-label">Repeated Themes</p>
-            <h2>Top Feedback Patterns</h2>
+            <h2>My Feedback Insights</h2>
           </div>
+          <select id="submissionFilter" class="submission-filter" aria-label="Filter feedback by recent submissions">
+            <option value="5" selected>Last 5 Submissions</option>
+            <option value="10">Last 10 Submissions</option>
+          </select>
         </div>
         <div class="theme-list" id="themeList"></div>
       </article>
 
-      <article class="feedback-panel score-panel">
-        <div class="panel-heading">
-          <div>
-            <p class="section-label">Private Agency Score</p>
-            <h2>Your Scoreboard</h2>
-          </div>
-        </div>
-        <div class="agency-scoreboard" id="agencyScoreboard"></div>
-      </article>
-    </section>
-
-    <section class="feedback-panel tips-panel">
-      <div class="panel-heading">
-        <div>
-          <p class="section-label">Creative Guidance</p>
-          <h2>Improvement Tips</h2>
-        </div>
-      </div>
-      <div class="tip-list" id="tipList"></div>
     </section>
 
     <footer>

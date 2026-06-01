@@ -6,7 +6,16 @@ const notificationCount = document.getElementById("notificationCount");
 const clearAllNotificationsBtn = document.getElementById("clearAllNotificationsBtn");
 const logoutBtn = document.querySelector(".logout");
 const agencyHeadline = document.getElementById("agencyHeadline");
-const DEFAULT_IMAGE = "/api/media/campaign-image?seed=campaign-default&title=Nestle%20Campaign";
+const CAMPAIGN_IMAGE_FILES = {
+    kitkat: ["kitkat1.jpg", "kitkat2.jpg", "kitkat3.jpg", "kitkat4.jpg", "kitkat5.jpg", "kitkat6.webp"],
+    maggi: ["maggi1.jpg", "maggi2.jpg", "maggi3.webp", "maggi4.jpg", "maggi5.jpg", "maggi6.jpg"],
+    milkmade: ["milkmade1.jpg", "milkmade2.jpg", "milkmade3.jpg", "milkmade4.jpg", "milkmade5.jpg", "milkmade6.avif"],
+    milo: ["milo1.jpg", "milo2.jpg", "milo3.jpg", "milo4.jpg", "milo5.jpg", "milo6.jpg"],
+    nescafe: ["nescafe1.jpg", "nescafe2.jpg", "nescafe3.jpg", "nescafe4.jpg", "nescafe5.jpg", "nescafe6.jpg"],
+    nespray: ["nespray1.jpg", "nespray2.jpg", "nespray3.jpg", "nespray4.jpg", "nespray5.jpg", "nespray6.jpg"],
+    nestum: ["nestum1.jpg", "nestum2.jpg", "nestum3.jpg", "nestum4.jpg", "nestum5.jpg", "nestum6.jpg"]
+};
+const DEFAULT_IMAGE = "Images/campaign_images/milo/milo1.jpg";
 
 const agencyId = localStorage.getItem("agencyId") || "";
 const role = localStorage.getItem("role") || "";
@@ -40,16 +49,18 @@ async function markNotificationRead(notificationId) {
     }
 }
 
-async function fetchCampaignImage(campaign) {
-    const cacheKey = `campaign-image-${campaign._id}`;
-    const cached = localStorage.getItem(cacheKey);
-    if (cached && cached.startsWith("/api/media/campaign-image")) {
-        return cached;
-    }
-
-    const generatedUrl = `/api/media/campaign-image?seed=${encodeURIComponent(campaign._id || Date.now())}&title=${encodeURIComponent(campaign.title || "Campaign")}`;
-    localStorage.setItem(cacheKey, generatedUrl);
-    return generatedUrl;
+function campaignProductKey(campaign) {
+    const normalized = String(campaign.productName || campaign.product || "")
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "")
+        .toLowerCase()
+        .replace(/^nestle\s+/, "")
+        .replace(/[^a-z0-9]/g, "");
+    const aliases = {
+        milkmaid: "milkmade",
+        nestlekitkat: "kitkat"
+    };
+    return aliases[normalized] || normalized;
 }
 
 function clearLegacyCampaignImageCache() {
@@ -62,11 +73,15 @@ function clearLegacyCampaignImageCache() {
     }
 
     keys.forEach((key) => {
-        const value = localStorage.getItem(key) || "";
-        if (!value.startsWith("/api/media/campaign-image")) {
-            localStorage.removeItem(key);
-        }
+        localStorage.removeItem(key);
     });
+}
+
+function campaignImage(campaign, productIndex) {
+    const productKey = campaignProductKey(campaign);
+    const files = CAMPAIGN_IMAGE_FILES[productKey] || CAMPAIGN_IMAGE_FILES.milo;
+    const safeIndex = Math.max(0, Number(productIndex || 0));
+    return `Images/campaign_images/${productKey in CAMPAIGN_IMAGE_FILES ? productKey : "milo"}/${files[safeIndex % files.length]}`;
 }
 
 async function renderCampaigns(campaigns) {
@@ -77,20 +92,19 @@ async function renderCampaigns(campaigns) {
         return;
     }
 
-    const usedImages = new Set();
+    const productImageCounts = {};
     for (const c of campaigns) {
-        const imageUrl = await fetchCampaignImage(c);
-        const uniqueImage = usedImages.has(imageUrl)
-            ? `/api/media/campaign-image?seed=${encodeURIComponent(`campaign-dup-${c._id}-${Date.now()}`)}&title=${encodeURIComponent(c.title || "Campaign")}`
-            : imageUrl;
-        usedImages.add(uniqueImage);
+        const productKey = campaignProductKey(c);
+        const nextProductIndex = productImageCounts[productKey] || 0;
+        productImageCounts[productKey] = nextProductIndex + 1;
+        const imageUrl = campaignImage(c, nextProductIndex);
         const card = document.createElement("div");
         card.className = "campaign-card";
 
         card.innerHTML = `
             <div class="campaign-card-content">
                 <h3>${escapeHtml(c.title)}</h3>
-                <img src="${escapeHtml(uniqueImage || DEFAULT_IMAGE)}" alt="${escapeHtml(c.title)} campaign image">
+                <img src="${escapeHtml(imageUrl || DEFAULT_IMAGE)}" alt="${escapeHtml(c.title)} campaign image">
                 <p><strong>Campaign Type:</strong> ${escapeHtml(c.campaignType || "-")}</p>
                 <p><strong>Timeline:</strong> ${escapeHtml(c.startDate)} to ${escapeHtml(c.endDate)}</p>
                 <p><strong>Budget:</strong> ${escapeHtml(c.budgetRange)}</p>
@@ -98,7 +112,7 @@ async function renderCampaigns(campaigns) {
         `;
         const imgEl = card.querySelector("img");
         imgEl.addEventListener("error", () => {
-            imgEl.src = `/api/media/campaign-image?seed=${encodeURIComponent(`campaign-card-${c._id || Date.now()}`)}&title=${encodeURIComponent(c.title || "Campaign")}`;
+            imgEl.src = DEFAULT_IMAGE;
         }, { once: true });
         card.addEventListener("click", () => {
             window.location.href = `campaign_detail.html?campaignId=${encodeURIComponent(c._id)}`;

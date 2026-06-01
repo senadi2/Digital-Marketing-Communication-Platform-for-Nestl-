@@ -28,6 +28,7 @@
         <div class="hero-summary">
           <div class="hero-meta">
             <p id="campaignStatus" class="status-pill">Pending</p>
+            <button type="button" class="hero-edit-btn" id="openEditCampaignBtn" hidden>Edit Campaign Brief</button>
           </div>
         </div>
       </div>
@@ -64,30 +65,57 @@
           </div>
           <div id="attachmentList" class="attachment-list"></div>
         </section>
+
+        <section class="detail-card brief-card brief-alignment-card" id="briefAlignmentSection" hidden>
+          <div class="section-heading">
+            <div>
+              <h2>Brief Alignment Rating</h2>
+            </div>
+          </div>
+          <form id="briefAlignmentForm" class="brief-alignment-form">
+            <label class="alignment-field alignment-rating-field" for="briefAlignmentRatingInput">
+              <input id="briefAlignmentRatingInput" type="number" min="0" max="100" step="1" placeholder="100%" required>
+            </label>
+            <p id="briefAlignmentMessage" class="decision-message" aria-live="polite"></p>
+            <button type="submit" class="primary-btn alignment-submit-btn" id="saveBriefAlignmentBtn">Submit</button>
+          </form>
+        </section>
+
       </div>
 
       <aside class="detail-sidebar">
-        <section class="detail-card compact-card">
+        <section class="detail-card compact-card" id="successMetricsSection">
           <div class="section-heading">
             <div>
-              <p class="section-label">Campaign Snapshot</p>
-              <h2>Key Details</h2>
+              <p class="section-label">Success Inputs</p>
+              <h2>Success Rate Data</h2>
             </div>
           </div>
-          <div class="info-grid">
-            <div class="info-item">
-              <label>Target Audience</label>
-              <p id="targetAudience">-</p>
+          <form id="successMetricsForm" class="success-metrics-form">
+            <label class="metric-field" for="targetReachedInput">
+              <span>Target Reach</span>
+              <input id="targetReachedInput" type="number" min="0" step="1" placeholder="0">
+            </label>
+            <label class="metric-field" for="actualReachedInput">
+              <span>Actual Reach</span>
+              <input id="actualReachedInput" type="number" min="0" step="1" placeholder="0">
+            </label>
+            <label class="metric-field" for="objectiveAchievedInput">
+              <span>Objective Achieved</span>
+              <select id="objectiveAchievedInput">
+                <option value="">Select result</option>
+                <option value="Yes">Yes</option>
+                <option value="Partial">Partial</option>
+                <option value="No">No</option>
+              </select>
+            </label>
+            <div class="success-rate-result" id="successRateResult">
+              <span>Success Rate</span>
+              <strong id="successRateValue">-</strong>
             </div>
-            <div class="info-item">
-              <label>Campaign Type</label>
-              <p id="campaignType">-</p>
-            </div>
-            <div class="info-item">
-              <label>Status</label>
-              <p id="statusDetail">Pending</p>
-            </div>
-          </div>
+            <p id="successMetricsMessage" class="decision-message" aria-live="polite"></p>
+            <button type="submit" class="primary-btn" id="saveSuccessMetricsBtn">Save Data</button>
+          </form>
         </section>
       </aside>
 
@@ -141,6 +169,22 @@
           <p id="rejectionReasonText">-</p>
         </section>
 
+        <section class="detail-card reassign-card" id="reassignAgencySection" hidden>
+          <div class="section-heading">
+            <div>
+              <p class="section-label">Marketing Manager Action</p>
+              <h2>Assign to Another Agency</h2>
+            </div>
+          </div>
+          <form id="reassignAgencyForm" class="reassign-agency-form">
+            <select id="reassignAgencySelect" aria-label="Select another agency">
+              <option value="">Select available agency</option>
+            </select>
+            <button type="submit" class="primary-btn" id="reassignAgencyBtn">Assign Campaign</button>
+          </form>
+          <p id="reassignAgencyMessage" class="decision-message" aria-live="polite"></p>
+        </section>
+
         <section class="detail-card action-card" id="decisionCard" hidden>
           <div class="section-heading">
             <div>
@@ -156,9 +200,74 @@
             <button type="button" class="primary-btn" id="acceptCampaignBtn">Accept Campaign</button>
           </div>
         </section>
+
       </div>
     </section>
   </main>
+
+  <div class="edit-campaign-modal" id="editCampaignModal" hidden>
+    <div class="edit-campaign-dialog" role="dialog" aria-modal="true" aria-labelledby="editCampaignTitle">
+      <div class="edit-campaign-head">
+        <h2 id="editCampaignTitle">Edit Campaign Brief</h2>
+        <button type="button" class="secondary-btn" id="closeEditCampaignBtn">Close</button>
+      </div>
+
+      <form id="editCampaignForm" class="edit-campaign-form">
+        <label class="edit-field" for="editCampaignName">
+          <span>Campaign Name</span>
+          <input id="editCampaignName" type="text" required>
+        </label>
+
+        <label class="edit-field" for="editTargetAudience">
+          <span>Target Audience</span>
+          <input id="editTargetAudience" type="text" required>
+        </label>
+
+        <label class="edit-field" for="editBudgetRange">
+          <span>Budget</span>
+          <input id="editBudgetRange" type="text" required>
+        </label>
+
+        <label class="edit-field" for="editCampaignType">
+          <span>Campaign Type</span>
+          <select id="editCampaignType" required>
+            <option value="">Select Campaign Type</option>
+            <option value="Post">Post / Document / PDF Creative</option>
+            <option value="Video">Video Creative</option>
+          </select>
+        </label>
+
+        <div class="edit-date-row">
+          <label class="edit-field" for="editStartDate">
+            <span>Start Date</span>
+            <input id="editStartDate" type="date" required>
+          </label>
+
+          <label class="edit-field" for="editEndDate">
+            <span>End Date</span>
+            <input id="editEndDate" type="date" required>
+          </label>
+        </div>
+
+        <label class="edit-field" for="editDescription">
+          <span>Description</span>
+          <textarea id="editDescription" rows="4" required></textarea>
+        </label>
+
+        <label class="edit-field" for="editObjectives">
+          <span>Objectives</span>
+          <textarea id="editObjectives" rows="4" required></textarea>
+        </label>
+
+        <p id="editCampaignMessage" class="decision-message" aria-live="polite"></p>
+
+        <div class="edit-campaign-actions">
+          <button type="button" class="secondary-btn" id="cancelEditCampaignBtn">Cancel</button>
+          <button type="submit" class="primary-btn" id="saveCampaignEditBtn">Save Changes</button>
+        </div>
+      </form>
+    </div>
+  </div>
 
   <script src="session_timeout.js"></script>
   <script src="campaign_detail.js"></script>

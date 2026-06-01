@@ -104,6 +104,34 @@ async function updateDocument(collectionName, id, updates) {
     return mapDoc(updated);
 }
 
+async function deleteDocument(collectionName, id) {
+    if (!id) return false;
+
+    const docRef = db.collection(collectionName).doc(String(id));
+    const existing = await docRef.get();
+    if (!existing.exists) return false;
+
+    await docRef.delete();
+    return true;
+}
+
+async function deleteCampaignNotifications(campaignId) {
+    const notifications = await listDocuments(NOTIFICATIONS_COLLECTION);
+    const matchingNotifications = notifications.filter((note) => String(note.campaignId || "") === String(campaignId || ""));
+
+    await Promise.all(matchingNotifications.map((note) => (
+        db.collection(NOTIFICATIONS_COLLECTION).doc(String(note._id)).delete()
+    )));
+}
+
+async function deleteCampaignCreativeFiles(campaignId) {
+    const campaignDir = path.resolve(CREATIVE_UPLOAD_DIR, String(campaignId || ""));
+    const uploadRoot = path.resolve(CREATIVE_UPLOAD_DIR);
+
+    if (!campaignId || !campaignDir.startsWith(uploadRoot)) return;
+    await fs.promises.rm(campaignDir, { recursive: true, force: true });
+}
+
 async function findUserByUsername(username) {
     const users = await listDocuments(USERS_COLLECTION);
     return users.find((user) => String(user.username || "") === String(username || "")) || null;
@@ -1126,6 +1154,214 @@ app.get("/api/campaigns/:id", async (req, res) => {
     }
 });
 
+app.patch("/api/campaigns/:id", async (req, res) => {
+    try {
+        if (!requireDb(res)) return;
+
+        const {
+            role,
+            userId,
+            title,
+            targetAudience = "",
+            budgetRange = "",
+            campaignType = "",
+            startDate = "",
+            endDate = "",
+            description = "",
+            objectives = "",
+            campaignGoal = "",
+            platforms = "",
+            expectedKpi = ""
+        } = req.body;
+
+        if (role !== "MarketingManager") {
+            return res.status(403).json({ message: "Only the marketing manager can edit campaign details" });
+        }
+
+        const user = userId ? await findUserById(userId) : null;
+        if (userId && user?.role !== "MarketingManager") {
+            return res.status(403).json({ message: "Invalid marketing manager account" });
+        }
+
+        const campaign = await getDocumentById(CAMPAIGNS_COLLECTION, req.params.id);
+        if (!campaign) return res.status(404).json({ message: "Campaign not found" });
+
+        const normalizedTitle = String(title || "").trim();
+        const normalizedTargetAudience = String(targetAudience || "").trim();
+        const normalizedBudgetRange = String(budgetRange || "").trim();
+        const normalizedCampaignType = String(campaignType || "").trim();
+        const normalizedStartDate = String(startDate || "").trim();
+        const normalizedEndDate = String(endDate || "").trim();
+        const normalizedDescription = String(description || "").trim();
+        const normalizedObjectives = String(objectives || campaignGoal || "").trim();
+
+        if (
+            !normalizedTitle
+            || !normalizedTargetAudience
+            || !normalizedBudgetRange
+            || !normalizedCampaignType
+            || !normalizedStartDate
+            || !normalizedEndDate
+            || !normalizedDescription
+            || !normalizedObjectives
+        ) {
+            return res.status(400).json({ message: "All campaign fields are required" });
+        }
+
+        const startTime = new Date(normalizedStartDate).getTime();
+        const endTime = new Date(normalizedEndDate).getTime();
+        if (Number.isNaN(startTime) || Number.isNaN(endTime)) {
+            return res.status(400).json({ message: "Campaign timeline dates are invalid" });
+        }
+        if (endTime < startTime) {
+            return res.status(400).json({ message: "End date cannot be earlier than start date" });
+        }
+
+        const updatedCampaign = await updateDocument(CAMPAIGNS_COLLECTION, req.params.id, {
+            title: normalizedTitle,
+            targetAudience: normalizedTargetAudience,
+            budgetRange: normalizedBudgetRange,
+            campaignType: normalizedCampaignType,
+            startDate: normalizedStartDate,
+            endDate: normalizedEndDate,
+            description: normalizedDescription,
+            objectives: normalizedObjectives,
+            campaignGoal: normalizedObjectives,
+            platforms: String(platforms || campaign.platforms || "").trim(),
+            expectedKpi: String(expectedKpi || campaign.expectedKpi || "").trim(),
+            editedBy: String(userId || ""),
+            editedAt: nowIso()
+        });
+
+        res.json(updatedCampaign);
+    } catch (err) {
+        console.log(err);
+        res.status(500).json({ message: "Error updating campaign details" });
+    }
+});
+
+app.delete("/api/campaigns/:id", async (req, res) => {
+    try {
+        if (!requireDb(res)) return;
+
+        const { role, userId } = req.body || {};
+        if (role !== "MarketingManager") {
+            return res.status(403).json({ message: "Only the marketing manager can delete campaigns" });
+        }
+
+        const user = userId ? await findUserById(userId) : null;
+        if (userId && user?.role !== "MarketingManager") {
+            return res.status(403).json({ message: "Invalid marketing manager account" });
+        }
+
+        const campaign = await getDocumentById(CAMPAIGNS_COLLECTION, req.params.id);
+        if (!campaign) return res.status(404).json({ message: "Campaign not found" });
+
+        const deleted = await deleteDocument(CAMPAIGNS_COLLECTION, req.params.id);
+        if (!deleted) return res.status(404).json({ message: "Campaign not found" });
+
+        await Promise.all([
+            deleteCampaignNotifications(req.params.id),
+            deleteCampaignCreativeFiles(req.params.id)
+        ]);
+
+        res.json({
+            message: "Campaign deleted successfully",
+            campaignId: String(req.params.id)
+        });
+    } catch (err) {
+        console.log(err);
+        res.status(500).json({ message: "Error deleting campaign" });
+    }
+});
+
+app.patch("/api/campaigns/:id/success-metrics", async (req, res) => {
+    try {
+        if (!requireDb(res)) return;
+
+        const { role, userId, targetReached, actualReached, objectiveAchieved } = req.body;
+        if (role !== "MarketingManager") {
+            return res.status(403).json({ message: "Only the marketing manager can update success data" });
+        }
+
+        const user = userId ? await findUserById(userId) : null;
+        if (userId && user?.role !== "MarketingManager") {
+            return res.status(403).json({ message: "Invalid marketing manager account" });
+        }
+
+        const campaign = await getDocumentById(CAMPAIGNS_COLLECTION, req.params.id);
+        if (!campaign) return res.status(404).json({ message: "Campaign not found" });
+
+        const normalizeMetricNumber = (value, label) => {
+            if (value === null || value === undefined || value === "") return null;
+            const numberValue = Number(value);
+            if (!Number.isFinite(numberValue) || numberValue < 0) {
+                throw new Error(`${label} must be a valid number`);
+            }
+            return Math.round(numberValue);
+        };
+
+        const normalizedObjective = String(objectiveAchieved || "").trim();
+        if (normalizedObjective && !["Yes", "Partial", "No"].includes(normalizedObjective)) {
+            return res.status(400).json({ message: "Objective Achieved must be Yes, Partial, or No" });
+        }
+
+        const successMetrics = {
+            targetReached: normalizeMetricNumber(targetReached, "Target Reached"),
+            actualReached: normalizeMetricNumber(actualReached, "Actual Reached"),
+            objectiveAchieved: normalizedObjective,
+            updatedBy: String(userId || ""),
+            updatedAt: nowIso()
+        };
+
+        const updatedCampaign = await updateDocument(CAMPAIGNS_COLLECTION, req.params.id, {
+            successMetrics
+        });
+
+        res.json(updatedCampaign);
+    } catch (err) {
+        console.log(err);
+        res.status(400).json({ message: err.message || "Error updating success data" });
+    }
+});
+
+app.patch("/api/campaigns/:id/brief-alignment-rating", async (req, res) => {
+    try {
+        if (!requireDb(res)) return;
+
+        const { role, userId, rating } = req.body;
+        if (role !== "BrandManager") {
+            return res.status(403).json({ message: "Only the brand manager can update brief alignment rating" });
+        }
+
+        const user = userId ? await findUserById(userId) : null;
+        if (userId && user?.role !== "BrandManager") {
+            return res.status(403).json({ message: "Invalid brand manager account" });
+        }
+
+        const campaign = await getDocumentById(CAMPAIGNS_COLLECTION, req.params.id);
+        if (!campaign) return res.status(404).json({ message: "Campaign not found" });
+
+        const numericRating = Number(rating);
+        if (!Number.isFinite(numericRating) || numericRating < 0 || numericRating > 100) {
+            return res.status(400).json({ message: "Rating must be a number from 0 to 100" });
+        }
+
+        const updatedCampaign = await updateDocument(CAMPAIGNS_COLLECTION, req.params.id, {
+            briefAlignmentRating: {
+                rating: Math.round(numericRating),
+                updatedBy: String(userId || ""),
+                updatedAt: nowIso()
+            }
+        });
+
+        res.json(updatedCampaign);
+    } catch (err) {
+        console.log(err);
+        res.status(500).json({ message: "Error updating brief alignment rating" });
+    }
+});
+
 app.patch("/api/campaigns/:id/status", async (req, res) => {
     try {
         if (!requireDb(res)) return;
@@ -1206,6 +1442,75 @@ app.patch("/api/campaigns/:id/status", async (req, res) => {
     } catch (err) {
         console.log(err);
         res.status(500).json({ message: "Error updating campaign status" });
+    }
+});
+
+app.patch("/api/campaigns/:id/reassign-agency", async (req, res) => {
+    try {
+        if (!requireDb(res)) return;
+
+        const { role, userId, agencyId } = req.body;
+        if (role !== "MarketingManager") {
+            return res.status(403).json({ message: "Only the marketing manager can share campaigns with another agency" });
+        }
+
+        const user = userId ? await findUserById(userId) : null;
+        if (userId && user?.role !== "MarketingManager") {
+            return res.status(403).json({ message: "Invalid marketing manager account" });
+        }
+
+        const campaign = await getDocumentById(CAMPAIGNS_COLLECTION, req.params.id);
+        if (!campaign) return res.status(404).json({ message: "Campaign not found" });
+
+        if (normalizeCampaignStatus(campaign.status) !== "Declined") {
+            return res.status(400).json({ message: "Only rejected campaigns can be shared with another agency" });
+        }
+
+        const newAgencyId = String(agencyId || "").trim();
+        if (!newAgencyId) {
+            return res.status(400).json({ message: "Please select an agency" });
+        }
+        if (newAgencyId === String(campaign.agencyId || "")) {
+            return res.status(400).json({ message: "Select a different agency" });
+        }
+
+        const agency = await getDocumentById(AGENCIES_COLLECTION, newAgencyId);
+        if (!agency) return res.status(404).json({ message: "Agency not found" });
+
+        const previousAgencyId = String(campaign.agencyId || "");
+        const previousHistory = Array.isArray(campaign.reassignmentHistory) ? campaign.reassignmentHistory : [];
+        const updatedCampaign = await updateDocument(CAMPAIGNS_COLLECTION, req.params.id, {
+            agencyId: newAgencyId,
+            status: "Pending",
+            rejectionReason: "",
+            creativeAssets: [],
+            reassignmentHistory: [
+                ...previousHistory,
+                {
+                    fromAgencyId: previousAgencyId,
+                    toAgencyId: newAgencyId,
+                    reassignedBy: String(userId || ""),
+                    reassignedAt: nowIso()
+                }
+            ]
+        });
+
+        await createDocument(NOTIFICATIONS_COLLECTION, {
+            userId: String(agency._id || ""),
+            fromUserId: String(userId || campaign.mmId || ""),
+            type: "campaign_request",
+            message: `Campaign "${campaign.title}" for ${campaign.productName || "a product"} has been shared with your agency.`,
+            campaignId: String(campaign._id || ""),
+            campaignTitle: campaign.title,
+            productId: String(campaign.productId || ""),
+            productName: campaign.productName || "",
+            status: "Pending"
+        });
+
+        res.json(updatedCampaign);
+    } catch (err) {
+        console.log(err);
+        res.status(500).json({ message: "Error sharing campaign with another agency" });
     }
 });
 

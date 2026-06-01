@@ -217,6 +217,60 @@ h2 {
     font-weight: 700;
 }
 
+.campaign-card-actions {
+    position: relative;
+    z-index: 2;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.campaign-icon-btn {
+    position: relative;
+    z-index: 2;
+    display: inline-grid;
+    place-items: center;
+    width: 30px;
+    height: 30px;
+    border-radius: 999px;
+    cursor: pointer;
+    transition: background 0.2s ease, color 0.2s ease, transform 0.2s ease;
+}
+
+.campaign-edit-btn {
+    border: 1px solid #c8d8f3;
+    background: #eef5ff;
+    color: var(--primary);
+}
+
+.campaign-delete-btn {
+    border: 1px solid #f3caca;
+    background: #fff5f5;
+    color: #b42318;
+}
+
+.campaign-icon-btn:hover,
+.campaign-icon-btn:focus-visible {
+    color: #fff;
+    transform: translateY(-1px);
+    outline: none;
+}
+
+.campaign-edit-btn:hover,
+.campaign-edit-btn:focus-visible {
+    background: var(--primary);
+}
+
+.campaign-delete-btn:hover,
+.campaign-delete-btn:focus-visible {
+    background: #b42318;
+}
+
+.campaign-icon-btn i {
+    font-size: 12px;
+    line-height: 1;
+}
+
 .campaign-footer-arrow {
     color: var(--primary);
 }

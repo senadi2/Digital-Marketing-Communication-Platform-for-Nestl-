@@ -48,30 +48,6 @@
       <p id="updatedAt">Loading...</p>
     </section>
 
-    <section class="overview-stats" id="summaryStats" aria-label="Review summary"></section>
-
-    <section class="overview-grid">
-      <article class="overview-panel pipeline-panel">
-        <div class="panel-heading">
-          <div>
-            <p class="section-label">Review Queue</p>
-            <h2>Status Breakdown</h2>
-          </div>
-        </div>
-        <div class="status-bars" id="statusBars"></div>
-      </article>
-
-      <article class="overview-panel action-panel">
-        <div class="panel-heading">
-          <div>
-            <p class="section-label">Brand Attention</p>
-            <h2>Needs Review</h2>
-          </div>
-        </div>
-        <div class="action-list" id="actionList"></div>
-      </article>
-    </section>
-
     <section class="overview-panel campaign-panel">
       <div class="panel-heading campaign-panel-heading">
         <div>
@@ -87,15 +63,14 @@
         </div>
       </div>
 
-      <div class="campaign-table-wrap">
-        <table class="campaign-table">
-          <thead>
+      <div class="campaign-table-wrap brand-review-table-wrap">
+        <table class="campaign-table brand-review-table">
+          <thead id="campaignTableHead">
             <tr>
               <th>Campaign</th>
               <th>Product</th>
               <th>Agency</th>
               <th>Review Status</th>
-              <th>Creative Review</th>
               <th>Latest Upload</th>
             </tr>
           </thead>

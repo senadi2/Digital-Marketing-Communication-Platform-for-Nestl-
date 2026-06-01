@@ -9,14 +9,40 @@ const heroEyebrow = document.getElementById("heroEyebrow");
 const titleEl = document.getElementById("campaignTitle");
 const campaignBudgetEl = document.getElementById("campaignBudget");
 const statusEl = document.getElementById("campaignStatus");
-const statusDetailEl = document.getElementById("statusDetail");
 const campaignTimelineEl = document.getElementById("campaignTimeline");
 const campaignAudienceChipEl = document.getElementById("campaignAudienceChip");
-const targetAudienceEl = document.getElementById("targetAudience");
-const campaignTypeEl = document.getElementById("campaignType");
 const descriptionEl = document.getElementById("description");
 const objectivesEl = document.getElementById("objectives");
 const attachmentList = document.getElementById("attachmentList");
+const openEditCampaignBtn = document.getElementById("openEditCampaignBtn");
+const editCampaignModal = document.getElementById("editCampaignModal");
+const closeEditCampaignBtn = document.getElementById("closeEditCampaignBtn");
+const cancelEditCampaignBtn = document.getElementById("cancelEditCampaignBtn");
+const editCampaignForm = document.getElementById("editCampaignForm");
+const editCampaignName = document.getElementById("editCampaignName");
+const editTargetAudience = document.getElementById("editTargetAudience");
+const editBudgetRange = document.getElementById("editBudgetRange");
+const editCampaignType = document.getElementById("editCampaignType");
+const editStartDate = document.getElementById("editStartDate");
+const editEndDate = document.getElementById("editEndDate");
+const editDescription = document.getElementById("editDescription");
+const editObjectives = document.getElementById("editObjectives");
+const editCampaignMessage = document.getElementById("editCampaignMessage");
+const saveCampaignEditBtn = document.getElementById("saveCampaignEditBtn");
+const briefAlignmentSection = document.getElementById("briefAlignmentSection");
+const briefAlignmentForm = document.getElementById("briefAlignmentForm");
+const briefAlignmentRatingInput = document.getElementById("briefAlignmentRatingInput");
+const briefAlignmentMessage = document.getElementById("briefAlignmentMessage");
+const saveBriefAlignmentBtn = document.getElementById("saveBriefAlignmentBtn");
+const successMetricsSection = document.getElementById("successMetricsSection");
+const successMetricsForm = document.getElementById("successMetricsForm");
+const targetReachedInput = document.getElementById("targetReachedInput");
+const actualReachedInput = document.getElementById("actualReachedInput");
+const objectiveAchievedInput = document.getElementById("objectiveAchievedInput");
+const successRateResult = document.getElementById("successRateResult");
+const successRateValue = document.getElementById("successRateValue");
+const successMetricsMessage = document.getElementById("successMetricsMessage");
+const saveSuccessMetricsBtn = document.getElementById("saveSuccessMetricsBtn");
 const creativeRoleNote = document.getElementById("creativeRoleNote");
 const creativeUploadForm = document.getElementById("creativeUploadForm");
 const creativeUploadModalTitle = document.getElementById("creativeUploadModalTitle");
@@ -32,6 +58,11 @@ const closeCreativeModalBtn = document.getElementById("closeCreativeModalBtn");
 const creativeDescriptionInput = document.getElementById("creativeDescriptionInput");
 const rejectionReasonSection = document.getElementById("rejectionReasonSection");
 const rejectionReasonText = document.getElementById("rejectionReasonText");
+const reassignAgencySection = document.getElementById("reassignAgencySection");
+const reassignAgencyForm = document.getElementById("reassignAgencyForm");
+const reassignAgencySelect = document.getElementById("reassignAgencySelect");
+const reassignAgencyBtn = document.getElementById("reassignAgencyBtn");
+const reassignAgencyMessage = document.getElementById("reassignAgencyMessage");
 const decisionCard = document.getElementById("decisionCard");
 const rejectionReasonInput = document.getElementById("rejectionReasonInput");
 const decisionMessage = document.getElementById("decisionMessage");
@@ -42,8 +73,12 @@ const agencyId = localStorage.getItem("agencyId") || "";
 const role = localStorage.getItem("role") || "";
 const userId = localStorage.getItem("userId") || "";
 
+document.body.classList.toggle("agency-view", role === "Agency");
+
 let currentCampaign = null;
 let activeVideoUrls = [];
+let allAgencies = [];
+let editPopupOpenedFromCard = false;
 
 const POST_CREATIVE_VARIANTS = [
     { channel: "Instagram Feed", width: 1080, height: 1080, aspectRatio: "1:1", format: "PNG" },
@@ -258,15 +293,190 @@ function setCreativeMessage(message, type = "") {
     creativeUploadMessage.className = `decision-message ${type}`.trim();
 }
 
+function setSuccessMetricsMessage(message, type = "") {
+    if (!successMetricsMessage) return;
+    successMetricsMessage.textContent = message;
+    successMetricsMessage.className = `decision-message ${type}`.trim();
+}
+
+function setEditCampaignMessage(message, type = "") {
+    if (!editCampaignMessage) return;
+    editCampaignMessage.textContent = message;
+    editCampaignMessage.className = `decision-message ${type}`.trim();
+}
+
+function setBriefAlignmentMessage(message, type = "") {
+    if (!briefAlignmentMessage) return;
+    briefAlignmentMessage.textContent = message;
+    briefAlignmentMessage.className = `decision-message ${type}`.trim();
+}
+
+function setReassignAgencyMessage(message, type = "") {
+    if (!reassignAgencyMessage) return;
+    reassignAgencyMessage.textContent = message;
+    reassignAgencyMessage.className = `decision-message ${type}`.trim();
+}
+
 function toggleDecisionControls(disabled) {
     acceptCampaignBtn.disabled = disabled;
     declineCampaignBtn.disabled = disabled;
     rejectionReasonInput.disabled = disabled;
 }
 
+function toggleReassignAgencyControls(disabled) {
+    if (reassignAgencySelect) reassignAgencySelect.disabled = disabled;
+    if (reassignAgencyBtn) reassignAgencyBtn.disabled = disabled;
+}
+
 function toggleCreativeUploadControls(disabled) {
     if (creativeUploadBtn) creativeUploadBtn.disabled = disabled;
     if (creativeUploadInput) creativeUploadInput.disabled = disabled;
+}
+
+function toggleSuccessMetricControls(disabled) {
+    [targetReachedInput, actualReachedInput, objectiveAchievedInput, saveSuccessMetricsBtn]
+        .filter(Boolean)
+        .forEach((control) => {
+            control.disabled = disabled;
+        });
+}
+
+function toggleEditCampaignControls(disabled) {
+    [
+        editCampaignName,
+        editTargetAudience,
+        editBudgetRange,
+        editCampaignType,
+        editStartDate,
+        editEndDate,
+        editDescription,
+        editObjectives,
+        saveCampaignEditBtn
+    ].filter(Boolean).forEach((control) => {
+        control.disabled = disabled;
+    });
+}
+
+function toggleBriefAlignmentControls(disabled) {
+    [briefAlignmentRatingInput, saveBriefAlignmentBtn].filter(Boolean).forEach((control) => {
+        control.disabled = disabled;
+    });
+}
+
+function applyBriefAlignmentRating(campaign) {
+    if (!briefAlignmentSection || !briefAlignmentForm) return;
+
+    const canRate = role === "BrandManager";
+    briefAlignmentSection.hidden = !canRate;
+    if (!canRate) return;
+
+    const rating = Number(campaign?.briefAlignmentRating?.rating);
+    briefAlignmentRatingInput.value = Number.isFinite(rating) && rating >= 0 && rating <= 100 ? String(rating) : "";
+    setBriefAlignmentMessage("");
+    toggleBriefAlignmentControls(false);
+}
+
+function openEditCampaignModal() {
+    if (!currentCampaign || role !== "MarketingManager" || !editCampaignModal) return;
+
+    editCampaignName.value = currentCampaign.title || "";
+    editTargetAudience.value = currentCampaign.targetAudience || "";
+    editBudgetRange.value = currentCampaign.budgetRange || "";
+    editCampaignType.value = currentCampaign.campaignType || "";
+    editStartDate.value = currentCampaign.startDate || "";
+    editEndDate.value = currentCampaign.endDate || "";
+    editDescription.value = currentCampaign.description || "";
+    editObjectives.value = currentCampaign.campaignGoal || currentCampaign.objectives || "";
+    setEditCampaignMessage("");
+    toggleEditCampaignControls(false);
+
+    editCampaignModal.hidden = false;
+    editCampaignModal.scrollTop = 0;
+    editCampaignName.focus();
+}
+
+function closeEditCampaignModal() {
+    if (!editCampaignModal) return;
+    editCampaignModal.hidden = true;
+    setEditCampaignMessage("");
+    editCampaignForm?.reset();
+}
+
+function metricInputValue(value) {
+    if (value === null || value === undefined || value === "") return "";
+    return Number.isFinite(Number(value)) ? String(Number(value)) : "";
+}
+
+function getObjectiveScore(value) {
+    const normalized = String(value || "").trim().toLowerCase();
+    if (normalized === "yes") return 100;
+    if (normalized === "partial") return 50;
+    if (normalized === "no") return 0;
+    return null;
+}
+
+function calculateSuccessRateFromValues(targetReached, actualReached, objectiveAchieved) {
+    const target = Number(targetReached);
+    const actual = Number(actualReached);
+    const objectiveScore = getObjectiveScore(objectiveAchieved);
+
+    if (!Number.isFinite(target) || target <= 0) return null;
+    if (!Number.isFinite(actual) || actual < 0) return null;
+    if (objectiveScore === null) return null;
+
+    const reachRate = (actual / target) * 100;
+    return Math.max(0, Math.min(100, (reachRate + objectiveScore) / 2));
+}
+
+function successRateClass(rate) {
+    if (rate === null) return "empty";
+    if (rate >= 90) return "green";
+    if (rate >= 70) return "yellow";
+    if (rate >= 50) return "orange";
+    return "red";
+}
+
+function updateSuccessRatePreview() {
+    if (!successRateResult || !successRateValue) return;
+
+    const rate = calculateSuccessRateFromValues(
+        targetReachedInput?.value,
+        actualReachedInput?.value,
+        objectiveAchievedInput?.value
+    );
+
+    successRateResult.className = `success-rate-result ${successRateClass(rate)}`;
+    successRateValue.textContent = rate === null ? "-" : `${rate.toFixed(1)}%`;
+}
+
+function applySuccessMetrics(metrics = {}) {
+    if (!successMetricsForm) return;
+
+    const canViewMetrics = role === "MarketingManager" || role === "BrandManager";
+    if (successMetricsSection) successMetricsSection.hidden = !canViewMetrics;
+    if (!canViewMetrics) return;
+
+    targetReachedInput.value = metricInputValue(metrics.targetReached);
+    actualReachedInput.value = metricInputValue(metrics.actualReached);
+    objectiveAchievedInput.value = ["Yes", "Partial", "No"].includes(metrics.objectiveAchieved)
+        ? metrics.objectiveAchieved
+        : "";
+
+    const canEditMetrics = role === "MarketingManager";
+    toggleSuccessMetricControls(!canEditMetrics);
+    if (saveSuccessMetricsBtn) saveSuccessMetricsBtn.hidden = !canEditMetrics;
+    updateSuccessRatePreview();
+}
+
+function readMetricNumber(input, label) {
+    const raw = String(input?.value || "").trim();
+    if (!raw) return null;
+
+    const value = Number(raw);
+    if (!Number.isFinite(value) || value < 0) {
+        throw new Error(`${label} must be a valid number.`);
+    }
+    return Math.round(value);
 }
 
 function downloadAttachment(file) {
@@ -1026,6 +1236,36 @@ function renderCreatives(creativeAssets) {
 
     });
 }
+
+function renderReassignAgencySection(campaign, reason) {
+    if (!reassignAgencySection || !reassignAgencySelect) return;
+
+    const campaignDecisionStatus = normalizeCampaignStatus(campaign.status);
+    const shouldShow = role === "MarketingManager" && campaignDecisionStatus === "Declined" && Boolean(reason);
+    reassignAgencySection.hidden = !shouldShow;
+    setReassignAgencyMessage("");
+
+    if (!shouldShow) return;
+
+    const currentAgencyId = String(campaign.agencyId || "");
+    const availableAgencies = allAgencies.filter((agency) => String(agency._id || "") !== currentAgencyId);
+    reassignAgencySelect.innerHTML = `<option value="">Select available agency</option>`;
+
+    availableAgencies.forEach((agency) => {
+        const option = document.createElement("option");
+        option.value = agency._id;
+        option.textContent = agency.name || "Unnamed Agency";
+        reassignAgencySelect.appendChild(option);
+    });
+
+    if (!availableAgencies.length) {
+        reassignAgencySelect.innerHTML = `<option value="">No other agencies available</option>`;
+        toggleReassignAgencyControls(true);
+    } else {
+        toggleReassignAgencyControls(false);
+    }
+}
+
 function applyCampaignDetails(campaign) {
     const campaignDecisionStatus = normalizeCampaignStatus(campaign.status);
     const displayStatus = getDisplayStatus(campaign);
@@ -1043,19 +1283,19 @@ function applyCampaignDetails(campaign) {
 
     statusEl.textContent = displayStatus;
     statusEl.className = `status-pill ${statusClass(displayStatus)}`;
-    statusDetailEl.textContent = displayStatus;
-
-    targetAudienceEl.textContent = campaign.targetAudience || "-";
-    campaignTypeEl.textContent = campaign.campaignType || "-";
     campaignTimelineEl.textContent = timeline;
     campaignAudienceChipEl.textContent = campaign.targetAudience
         ? `Audience: ${campaign.targetAudience}`
         : "Audience pending";
     descriptionEl.textContent = campaign.description || "-";
     objectivesEl.textContent = campaign.campaignGoal || campaign.objectives || "-";
+    if (openEditCampaignBtn) {
+        openEditCampaignBtn.hidden = true;
+    }
 
     rejectionReasonSection.hidden = !reason;
     rejectionReasonText.textContent = reason || "-";
+    renderReassignAgencySection(campaign, reason);
 
     const isAgencyViewer = role === "Agency" && agencyId && campaign.agencyId === agencyId;
     decisionCard.hidden = !(isAgencyViewer && campaignDecisionStatus === "Pending");
@@ -1067,6 +1307,8 @@ function applyCampaignDetails(campaign) {
     }
 
     renderAttachments(attachments);
+    applySuccessMetrics(campaign.successMetrics || {});
+    applyBriefAlignmentRating(campaign);
     renderCreatives(creativeAssets);
 }
 
@@ -1077,15 +1319,30 @@ async function loadCampaignDetails() {
     }
 
     try {
-        const res = await fetch(`/api/campaigns/${encodeURIComponent(campaignId)}`);
-        const campaign = await res.json();
+        const requests = [fetch(`/api/campaigns/${encodeURIComponent(campaignId)}`)];
+        if (role === "MarketingManager") {
+            requests.push(fetch("/api/agencies"));
+        }
+        const [res, agencyRes] = await Promise.all(requests);
+        const [campaign, agencyData] = await Promise.all([
+            res.json(),
+            agencyRes ? agencyRes.json() : Promise.resolve([])
+        ]);
 
         if (!res.ok) {
             throw new Error(campaign.message || "Failed to load campaign");
         }
+        if (agencyRes && !agencyRes.ok) {
+            throw new Error(agencyData.message || "Failed to load agencies");
+        }
 
+        allAgencies = Array.isArray(agencyData) ? agencyData : allAgencies;
         currentCampaign = campaign;
         applyCampaignDetails(campaign);
+        if (role === "MarketingManager" && params.get("edit") === "1" && !editPopupOpenedFromCard) {
+            editPopupOpenedFromCard = true;
+            openEditCampaignModal();
+        }
     } catch (err) {
         titleEl.textContent = "Campaign not found";
         descriptionEl.textContent = err.message || "Could not load campaign details.";
@@ -1129,6 +1386,109 @@ async function submitDecision(status) {
         setDecisionMessage(err.message || "Error updating campaign.", "error");
     } finally {
         toggleDecisionControls(false);
+    }
+}
+
+async function submitCampaignEdit(event) {
+    event.preventDefault();
+
+    if (!currentCampaign || role !== "MarketingManager") {
+        setEditCampaignMessage("Only the marketing manager can edit campaign details.", "error");
+        return;
+    }
+
+    const payload = {
+        title: editCampaignName.value.trim(),
+        targetAudience: editTargetAudience.value.trim(),
+        budgetRange: editBudgetRange.value.trim(),
+        campaignType: editCampaignType.value.trim(),
+        startDate: editStartDate.value,
+        endDate: editEndDate.value,
+        description: editDescription.value.trim(),
+        objectives: editObjectives.value.trim(),
+        campaignGoal: editObjectives.value.trim()
+    };
+
+    if (Object.values(payload).some((value) => !String(value || "").trim())) {
+        setEditCampaignMessage("Please fill all campaign fields before saving.", "error");
+        return;
+    }
+
+    if (new Date(payload.endDate).getTime() < new Date(payload.startDate).getTime()) {
+        setEditCampaignMessage("End date cannot be earlier than start date.", "error");
+        return;
+    }
+
+    try {
+        toggleEditCampaignControls(true);
+        setEditCampaignMessage("Saving campaign changes...");
+
+        const res = await fetch(`/api/campaigns/${encodeURIComponent(campaignId)}`, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+                userId,
+                role,
+                ...payload
+            })
+        });
+
+        const data = await res.json();
+        if (!res.ok) {
+            throw new Error(data.message || "Failed to update campaign");
+        }
+
+        currentCampaign = data;
+        applyCampaignDetails(data);
+        setEditCampaignMessage("Campaign details updated.", "success");
+        setTimeout(closeEditCampaignModal, 450);
+    } catch (err) {
+        setEditCampaignMessage(err.message || "Error updating campaign.", "error");
+    } finally {
+        toggleEditCampaignControls(false);
+    }
+}
+
+async function submitAgencyReassignment(event) {
+    event.preventDefault();
+
+    if (!currentCampaign || role !== "MarketingManager") {
+        setReassignAgencyMessage("Only the marketing manager can share rejected campaigns.", "error");
+        return;
+    }
+
+    const newAgencyId = String(reassignAgencySelect?.value || "").trim();
+    if (!newAgencyId) {
+        setReassignAgencyMessage("Please select an agency to share this campaign with.", "error");
+        return;
+    }
+
+    try {
+        toggleReassignAgencyControls(true);
+        setReassignAgencyMessage("Sharing campaign with selected agency...");
+
+        const res = await fetch(`/api/campaigns/${encodeURIComponent(campaignId)}/reassign-agency`, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+                userId,
+                role,
+                agencyId: newAgencyId
+            })
+        });
+
+        const data = await res.json();
+        if (!res.ok) {
+            throw new Error(data.message || "Failed to share campaign");
+        }
+
+        currentCampaign = data;
+        applyCampaignDetails(data);
+        setReassignAgencyMessage("Campaign shared with the selected agency.", "success");
+        alert("Campaign shared with the selected agency.");
+    } catch (err) {
+        setReassignAgencyMessage(err.message || "Error sharing campaign.", "error");
+        toggleReassignAgencyControls(false);
     }
 }
 
@@ -1176,6 +1536,96 @@ async function submitCreativeUpload(event) {
     } finally {
         toggleCreativeUploadControls(false);
         renderCreatives(currentCampaign?.creativeAssets || []);
+    }
+}
+
+async function submitSuccessMetrics(event) {
+    event.preventDefault();
+
+    if (!currentCampaign || role !== "MarketingManager") {
+        setSuccessMetricsMessage("Only the marketing manager can save success data.", "error");
+        return;
+    }
+
+    try {
+        toggleSuccessMetricControls(true);
+        setSuccessMetricsMessage("Saving success data...");
+
+        const payload = {
+            targetReached: readMetricNumber(targetReachedInput, "Target Reached"),
+            actualReached: readMetricNumber(actualReachedInput, "Actual Reached"),
+            objectiveAchieved: objectiveAchievedInput.value
+        };
+
+        if (payload.objectiveAchieved && !["Yes", "Partial", "No"].includes(payload.objectiveAchieved)) {
+            throw new Error("Objective Achieved must be Yes, Partial, or No.");
+        }
+
+        const res = await fetch(`/api/campaigns/${encodeURIComponent(campaignId)}/success-metrics`, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+                userId,
+                role,
+                ...payload
+            })
+        });
+
+        const data = await res.json();
+        if (!res.ok) {
+            throw new Error(data.message || "Failed to save success data");
+        }
+
+        currentCampaign = data;
+        applySuccessMetrics(data.successMetrics || {});
+        setSuccessMetricsMessage("Success data saved.", "success");
+    } catch (err) {
+        setSuccessMetricsMessage(err.message || "Error saving success data.", "error");
+    } finally {
+        toggleSuccessMetricControls(role !== "MarketingManager");
+    }
+}
+
+async function submitBriefAlignmentRating(event) {
+    event.preventDefault();
+
+    if (!currentCampaign || role !== "BrandManager") {
+        setBriefAlignmentMessage("Only the brand manager can save this rating.", "error");
+        return;
+    }
+
+    const rating = Number(briefAlignmentRatingInput?.value || 0);
+    if (!Number.isFinite(rating) || rating < 0 || rating > 100) {
+        setBriefAlignmentMessage("Please enter a rating from 0% to 100%.", "error");
+        return;
+    }
+
+    try {
+        toggleBriefAlignmentControls(true);
+        setBriefAlignmentMessage("Saving rating...");
+
+        const res = await fetch(`/api/campaigns/${encodeURIComponent(campaignId)}/brief-alignment-rating`, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+                userId,
+                role,
+                rating: Math.round(rating)
+            })
+        });
+
+        const data = await res.json();
+        if (!res.ok) {
+            throw new Error(data.message || "Failed to save rating");
+        }
+
+        currentCampaign = data;
+        applyBriefAlignmentRating(data);
+        setBriefAlignmentMessage("Brief alignment rating saved.", "success");
+    } catch (err) {
+        setBriefAlignmentMessage(err.message || "Error saving rating.", "error");
+    } finally {
+        toggleBriefAlignmentControls(false);
     }
 }
 
@@ -1298,6 +1748,22 @@ creativeUploadModal?.addEventListener("click", (event) => {
 });
 
 creativeUploadForm?.addEventListener("submit", submitCreativeUpload);
+successMetricsForm?.addEventListener("submit", submitSuccessMetrics);
+[targetReachedInput, actualReachedInput, objectiveAchievedInput].filter(Boolean).forEach((control) => {
+    control.addEventListener("input", updateSuccessRatePreview);
+    control.addEventListener("change", updateSuccessRatePreview);
+});
+briefAlignmentForm?.addEventListener("submit", submitBriefAlignmentRating);
+editCampaignForm?.addEventListener("submit", submitCampaignEdit);
+reassignAgencyForm?.addEventListener("submit", submitAgencyReassignment);
+openEditCampaignBtn?.addEventListener("click", openEditCampaignModal);
+closeEditCampaignBtn?.addEventListener("click", closeEditCampaignModal);
+cancelEditCampaignBtn?.addEventListener("click", closeEditCampaignModal);
+editCampaignModal?.addEventListener("click", (event) => {
+    if (event.target === editCampaignModal) {
+        closeEditCampaignModal();
+    }
+});
 
 setBackLink();
 loadCampaignDetails();

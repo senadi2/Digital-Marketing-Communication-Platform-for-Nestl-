@@ -27,6 +27,7 @@ let currentProduct = null;
 let allAgencies = [];
 
 const DEFAULT_PRODUCT_IMAGE = "Images/logo_nobackground.png";
+const canDeleteCampaigns = role === "MarketingManager";
 
 if (dashboardBackLink && role === "BrandManager") {
     dashboardBackLink.href = "BM_dash.html";
@@ -111,6 +112,44 @@ function openCampaignDetail(campaignId, campaignAgencyId) {
     if (productId) detailUrl.searchParams.set("productId", productId);
     if (campaignAgencyId || agencyId) detailUrl.searchParams.set("agencyId", campaignAgencyId || agencyId);
     window.location.href = detailUrl.toString();
+}
+
+function openCampaignEditPopup(campaignId, campaignAgencyId) {
+    if (!campaignId || !canDeleteCampaigns) return;
+    const detailUrl = new URL("campaign_detail.html", window.location.href);
+    detailUrl.searchParams.set("campaignId", campaignId);
+    detailUrl.searchParams.set("edit", "1");
+    if (productId) detailUrl.searchParams.set("productId", productId);
+    if (campaignAgencyId || agencyId) detailUrl.searchParams.set("agencyId", campaignAgencyId || agencyId);
+    window.location.href = detailUrl.toString();
+}
+
+async function deleteCampaign(campaign) {
+    if (!campaign?._id || !canDeleteCampaigns) return;
+
+    const confirmed = window.confirm(`Delete "${campaign.title || "this campaign"}"? This will remove it from all dashboards.`);
+    if (!confirmed) return;
+
+    try {
+        const res = await fetch(`/api/campaigns/${encodeURIComponent(campaign._id)}`, {
+            method: "DELETE",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ role, userId })
+        });
+        const data = await res.json().catch(() => ({}));
+
+        if (!res.ok) {
+            throw new Error(data.message || "Could not delete campaign");
+        }
+
+        if (productId) {
+            await loadProductInfo();
+        } else {
+            await loadCampaignsByAgency();
+        }
+    } catch (err) {
+        alert(err.message || "Could not delete campaign");
+    }
 }
 
 function fileToBase64(file) {
@@ -228,6 +267,12 @@ function renderCampaigns(campaigns) {
         card.innerHTML = `
             <div class="campaign-card-header">
                 <span class="campaign-status ${escapeHtml(statusClass(status))}">${escapeHtml(status)}</span>
+                ${canDeleteCampaigns ? `
+                    <span class="campaign-card-actions">
+                        <button type="button" class="campaign-icon-btn campaign-edit-btn" aria-label="Edit ${escapeHtml(campaign.title || "campaign")}" title="Edit campaign"><i class="fa-solid fa-pen"></i></button>
+                        <button type="button" class="campaign-icon-btn campaign-delete-btn" aria-label="Delete ${escapeHtml(campaign.title || "campaign")}" title="Delete campaign"><i class="fa-solid fa-trash"></i></button>
+                    </span>
+                ` : ""}
             </div>
             <h3>${escapeHtml(campaign.title)}</h3>
             <p class="campaign-meta">Product: ${escapeHtml(campaign.productName || currentProduct?.name || "-")}</p>
@@ -242,6 +287,16 @@ function renderCampaigns(campaigns) {
             </div>
         `;
         card.addEventListener("click", () => openCampaignDetail(campaign._id, campaign.agencyId));
+        const editButton = card.querySelector(".campaign-edit-btn");
+        editButton?.addEventListener("click", (event) => {
+            event.stopPropagation();
+            openCampaignEditPopup(campaign._id, campaign.agencyId);
+        });
+        const deleteButton = card.querySelector(".campaign-delete-btn");
+        deleteButton?.addEventListener("click", (event) => {
+            event.stopPropagation();
+            deleteCampaign(campaign);
+        });
         card.addEventListener("keydown", (event) => {
             if (event.key === "Enter" || event.key === " ") {
                 event.preventDefault();

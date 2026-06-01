@@ -41,39 +41,36 @@
       </div>
     </div>
 
-    <section class="performance-header">
-      <div>
-        <p class="section-label">Agency Performance Monitoring</p>
-        <h1>Agency Efficiency</h1>
+    <section class="scoreboard-panel">
+      <div class="scoreboard-heading">
+        <div>
+          <p class="section-label">Agency Scoreboard</p>
+          <h1>Top Agency Ranking</h1>
+        </div>
+        <div class="period-filter" aria-label="Filter agency ranking period">
+          <i class="fa-solid fa-filter" aria-hidden="true"></i>
+          <select id="periodFilter" aria-label="Filter agency ranking period">
+            <option value="1" selected>Last Month</option>
+            <option value="3">Last 3 Months</option>
+            <option value="6">Last 6 Months</option>
+            <option value="12">Last Year</option>
+          </select>
+        </div>
       </div>
-      <p id="updatedAt">Loading...</p>
+
+      <div class="scoreboard-table-wrap">
+        <table class="scoreboard-table">
+          <thead>
+            <tr>
+              <th>Rank</th>
+              <th>Agency</th>
+              <th>Average Agency Score</th>
+            </tr>
+          </thead>
+          <tbody id="agencyScoreboardBody"></tbody>
+        </table>
+      </div>
     </section>
-
-    <section class="performance-kpis" id="performanceKpis" aria-label="Agency performance summary"></section>
-
-    <section class="performance-layout">
-      <article class="performance-panel leaderboard-panel">
-        <div class="panel-heading">
-          <div>
-            <p class="section-label">Leaderboard</p>
-            <h2>Top Agency Ranking</h2>
-          </div>
-        </div>
-        <div class="leaderboard-list" id="leaderboardList"></div>
-      </article>
-
-      <article class="performance-panel insights-panel">
-        <div class="panel-heading">
-          <div>
-            <p class="section-label">Performance Insights</p>
-            <h2>What Stands Out</h2>
-          </div>
-        </div>
-        <div class="insight-list" id="insightList"></div>
-      </article>
-    </section>
-
-    <section class="agency-card-grid" id="agencyCardGrid" aria-label="Agency scorecards"></section>
 
     <footer>
       Nestle Digital Marketing Platform | System Version 1.0 | &copy; 2026 Nestle Sri Lanka

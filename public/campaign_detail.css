@@ -144,10 +144,14 @@ body {
     margin-top: 18px;
 }
 
+.meta-chip {
+    gap: 8px;
+}
+
 .hero-meta {
     flex-direction: column;
     align-items: flex-end;
-    gap: 0;
+    gap: 12px;
     margin-top: 0;
 }
 
@@ -192,6 +196,22 @@ body {
     color: var(--danger-text);
 }
 
+.hero-edit-btn {
+    border: 1px solid rgba(255, 255, 255, 0.28);
+    border-radius: 12px;
+    padding: 10px 14px;
+    background: rgba(255, 255, 255, 0.12);
+    color: #fff;
+    font: inherit;
+    font-size: 13px;
+    font-weight: 700;
+    cursor: pointer;
+}
+
+.hero-edit-btn:hover {
+    background: rgba(255, 255, 255, 0.2);
+}
+
 .meta-chip {
     border: 1px solid rgba(255, 255, 255, 0.16);
     background: rgba(255, 255, 255, 0.1);
@@ -221,6 +241,14 @@ body {
 
 .detail-fullwidth {
     grid-column: 1 / -1;
+}
+
+body.agency-view .detail-main {
+    grid-column: 1 / -1;
+}
+
+body.agency-view .detail-sidebar {
+    display: none;
 }
 
 .detail-card {
@@ -328,6 +356,196 @@ body {
     font-weight: 600;
     line-height: 1.35;
     font-size: 13px;
+}
+
+.success-metrics-form {
+    display: grid;
+    gap: 10px;
+}
+
+.metric-field {
+    display: grid;
+    gap: 6px;
+}
+
+.metric-field span {
+    color: #5f5b5b;
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+}
+
+.metric-field input,
+.metric-field select {
+    width: 100%;
+    min-height: 42px;
+    padding: 10px 12px;
+    border: 1px solid #d4dce8;
+    border-radius: 10px;
+    background: #fff;
+    color: var(--text);
+    font: inherit;
+    font-size: 13px;
+}
+
+.metric-field input[type="number"] {
+    appearance: textfield;
+    -moz-appearance: textfield;
+}
+
+.metric-field input[type="number"]::-webkit-inner-spin-button,
+.metric-field input[type="number"]::-webkit-outer-spin-button {
+    margin: 0;
+    -webkit-appearance: none;
+}
+
+.metric-field input:focus,
+.metric-field select:focus {
+    outline: 3px solid rgba(0, 58, 143, 0.16);
+    border-color: var(--primary);
+}
+
+.success-rate-result {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 12px;
+    border-radius: 12px;
+    border: 1px solid rgba(215, 224, 236, 0.95);
+    background: var(--surface-soft);
+}
+
+.success-rate-result span {
+    color: #5f5b5b;
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+}
+
+.success-rate-result strong {
+    font-size: 22px;
+    line-height: 1;
+}
+
+.success-rate-result.empty {
+    color: var(--text-soft);
+}
+
+.success-rate-result.green {
+    background: #e9f8ef;
+    border-color: rgba(23, 114, 69, 0.22);
+    color: #177245;
+}
+
+.success-rate-result.yellow {
+    background: #fff8db;
+    border-color: rgba(217, 154, 24, 0.28);
+    color: #8a6d00;
+}
+
+.success-rate-result.orange {
+    background: #fff0df;
+    border-color: rgba(247, 144, 9, 0.3);
+    color: #b54708;
+}
+
+.success-rate-result.red {
+    background: #fdecec;
+    border-color: rgba(180, 35, 24, 0.22);
+    color: #b42318;
+}
+
+.brief-alignment-card {
+    background: var(--surface);
+    padding: 16px 18px;
+}
+
+.brief-alignment-card .section-heading {
+    margin-bottom: 10px;
+}
+
+.brief-alignment-form {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
+.alignment-field {
+    display: block;
+}
+
+.alignment-field span {
+    color: #5f5b5b;
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+}
+
+.alignment-rating-field {
+    flex: 0 0 150px;
+}
+
+.alignment-field input {
+    width: 100%;
+    min-height: 38px;
+    padding: 8px 11px;
+    border: 1px solid #d4dce8;
+    border-radius: 10px;
+    background: #fff;
+    color: var(--text);
+    font: inherit;
+    font-size: 13px;
+}
+
+.alignment-field input[type="number"] {
+    appearance: textfield;
+    -moz-appearance: textfield;
+}
+
+.alignment-field input[type="number"]::-webkit-inner-spin-button,
+.alignment-field input[type="number"]::-webkit-outer-spin-button {
+    margin: 0;
+    -webkit-appearance: none;
+}
+
+.alignment-field input:focus {
+    outline: 3px solid rgba(0, 58, 143, 0.16);
+    border-color: var(--primary);
+}
+
+.brief-alignment-form .decision-message {
+    order: 3;
+    flex: 1 1 100%;
+    margin: 0 !important;
+    min-height: 18px;
+    display: flex;
+    align-items: center;
+}
+
+.brief-alignment-form .decision-message:empty {
+    display: none;
+}
+
+.brief-alignment-form .primary-btn {
+    min-height: 38px;
+    padding: 8px 13px;
+    white-space: nowrap;
+    width: auto;
+    flex: 0 0 auto;
+}
+
+.brief-alignment-form .alignment-submit-btn {
+    background: #177245;
+    color: #fff;
+}
+
+.brief-alignment-form .alignment-submit-btn:hover {
+    background: #125c38;
 }
 
 .attachment-list {
@@ -1170,6 +1388,40 @@ body {
     margin-bottom: 14px !important;
 }
 
+.reassign-card {
+    border-color: rgba(0, 58, 143, 0.16);
+    background: #fff;
+}
+
+.reassign-agency-form {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
+}
+
+.reassign-agency-form select {
+    flex: 1 1 280px;
+    min-height: 46px;
+    padding: 11px 12px;
+    border: 1px solid #d4dce8;
+    border-radius: 12px;
+    background: #fff;
+    color: var(--text);
+    font: inherit;
+}
+
+.reassign-agency-form select:focus {
+    outline: 3px solid rgba(0, 58, 143, 0.16);
+    border-color: var(--primary);
+}
+
+.reassign-agency-form .primary-btn {
+    min-height: 46px;
+    width: auto;
+    white-space: nowrap;
+}
+
 #rejectionReasonInput {
     width: 100%;
     min-height: 120px;
@@ -1205,6 +1457,100 @@ body {
 .decision-actions {
     justify-content: flex-end;
     gap: 10px;
+}
+
+.edit-campaign-modal {
+    position: fixed;
+    inset: 0;
+    z-index: 1300;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow-y: auto;
+    padding: 22px;
+    background: rgba(10, 20, 37, 0.56);
+}
+
+.edit-campaign-modal[hidden] {
+    display: none;
+}
+
+.edit-campaign-dialog {
+    width: min(720px, 100%);
+    max-height: calc(100vh - 44px);
+    overflow-y: auto;
+    padding: 22px;
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    background: #fff;
+    box-shadow: 0 24px 56px rgba(10, 37, 64, 0.22);
+}
+
+.edit-campaign-head,
+.edit-campaign-actions,
+.edit-date-row {
+    display: flex;
+    gap: 12px;
+}
+
+.edit-campaign-head {
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 16px;
+}
+
+.edit-campaign-head h2 {
+    margin: 0;
+}
+
+.edit-campaign-form {
+    display: grid;
+    gap: 14px;
+}
+
+.edit-field {
+    display: grid;
+    gap: 6px;
+}
+
+.edit-field span {
+    color: #5f5b5b;
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+}
+
+.edit-field input,
+.edit-field select,
+.edit-field textarea {
+    width: 100%;
+    padding: 11px 12px;
+    border: 1px solid #d4dce8;
+    border-radius: 10px;
+    background: #fff;
+    color: var(--text);
+    font: inherit;
+    font-size: 14px;
+}
+
+.edit-field textarea {
+    resize: vertical;
+}
+
+.edit-field input:focus,
+.edit-field select:focus,
+.edit-field textarea:focus {
+    outline: 3px solid rgba(0, 58, 143, 0.16);
+    border-color: var(--primary);
+}
+
+.edit-date-row > .edit-field {
+    flex: 1 1 0;
+}
+
+.edit-campaign-actions {
+    justify-content: flex-end;
 }
 
 .empty-text {
@@ -1257,11 +1603,19 @@ body {
     }
 
     .decision-actions,
+    .reassign-agency-form,
+    .edit-campaign-actions,
+    .edit-date-row,
+    .brief-alignment-form,
     .attachment-item,
     .upload-form-actions,
     .comment-form-actions {
         flex-direction: column;
         align-items: stretch;
+    }
+
+    .brief-alignment-form {
+        display: flex;
     }
 
     .creative-toolbar {

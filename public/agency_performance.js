@@ -1,13 +1,11 @@
 const role = localStorage.getItem("role") || "";
 const userId = localStorage.getItem("userId") || "";
+const agencyScoreboardBody = document.getElementById("agencyScoreboardBody");
+const periodFilter = document.getElementById("periodFilter");
 
-const performanceKpis = document.getElementById("performanceKpis");
-const leaderboardList = document.getElementById("leaderboardList");
-const insightList = document.getElementById("insightList");
-const agencyCardGrid = document.getElementById("agencyCardGrid");
-const updatedAt = document.getElementById("updatedAt");
-
-let agencyMetrics = [];
+let agencies = [];
+let campaigns = [];
+let selectedPeriodMonths = 1;
 
 if (role && role !== "MarketingManager") {
     window.location.href = role === "BrandManager" ? "BM_dash.html" : "AA_DASH.html";
@@ -22,247 +20,191 @@ function escapeHtml(value) {
         .replace(/'/g, "&#39;");
 }
 
-function normalizeCampaignStatus(status) {
-    const value = String(status || "").trim().toLowerCase();
-    if (value === "accepted") return "Accepted";
-    if (value === "decline" || value === "declined") return "Declined";
-    return "Pending";
+function toTimestamp(value) {
+    const time = new Date(value || "").getTime();
+    return Number.isNaN(time) ? 0 : time;
 }
 
-function normalizeCreativeStatus(status) {
-    const value = String(status || "").trim().toLowerCase();
-    if (value === "approved") return "Approved";
-    if (value === "changes requested") return "Changes Requested";
-    return "Pending Review";
+function campaignPeriodTimestamp(campaign) {
+    return toTimestamp(campaign?.endDate) || toTimestamp(campaign?.startDate) || toTimestamp(campaign?.createdAt);
 }
 
-function percent(part, total) {
-    if (!total) return 0;
-    return Math.round((part / total) * 100);
+function periodStartDate(months) {
+    const start = new Date();
+    start.setHours(0, 0, 0, 0);
+    start.setMonth(start.getMonth() - Number(months || 1));
+    return start.getTime();
 }
 
-function clamp(value, min, max) {
-    return Math.min(Math.max(value, min), max);
+function campaignsForSelectedPeriod() {
+    const startTime = periodStartDate(selectedPeriodMonths);
+    return campaigns.filter((campaign) => {
+        const timestamp = campaignPeriodTimestamp(campaign);
+        return timestamp >= startTime;
+    });
 }
 
-function performanceLabel(metric) {
-    if (!metric.submissions) return "No activity";
-    if (metric.efficiencyScore >= 80) return "Excellent";
-    if (metric.efficiencyScore >= 55) return "Reliable";
-    return "Needs attention";
+function objectiveRate(value) {
+    const normalized = String(value || "").trim().toLowerCase();
+    if (normalized === "yes") return 100;
+    if (normalized === "partial") return 50;
+    if (normalized === "no") return 0;
+    return null;
 }
 
-function labelClass(label) {
-    return String(label || "")
-        .toLowerCase()
-        .replace(/\s+/g, "-");
+function campaignSuccessRate(campaign) {
+    const metrics = campaign?.successMetrics || {};
+    const targetReached = Number(metrics.targetReached);
+    const actualReached = Number(metrics.actualReached);
+    const objective = objectiveRate(metrics.objectiveAchieved);
+
+    if (!Number.isFinite(targetReached) || targetReached <= 0) return null;
+    if (!Number.isFinite(actualReached) || actualReached < 0) return null;
+    if (objective === null) return null;
+
+    const reachRate = (actualReached / targetReached) * 100;
+    return Math.max(0, Math.min(100, (reachRate + objective) / 2));
 }
 
-function openAgency(metric) {
-    if (!metric?.agencyId) return;
-    window.location.href = `create_brief.html?agencyId=${encodeURIComponent(metric.agencyId)}`;
+function briefAlignmentRate(campaign) {
+    const rating = Number(campaign?.briefAlignmentRating?.rating);
+    if (!Number.isFinite(rating) || rating < 0 || rating > 100) return null;
+    return rating;
 }
 
-function buildAgencyMetrics(agencies, campaigns) {
+function firstAgencySubmissionDate(campaign) {
+    const creativeAssets = Array.isArray(campaign?.creativeAssets) ? campaign.creativeAssets : [];
+    const uploadTimes = creativeAssets
+        .map((asset) => toTimestamp(asset.uploadedAt))
+        .filter((time) => time > 0)
+        .sort((a, b) => a - b);
+
+    return uploadTimes[0] || 0;
+}
+
+function onTimeDeliveryScore(campaign) {
+    const dueTime = toTimestamp(campaign?.endDate);
+    const submittedTime = firstAgencySubmissionDate(campaign);
+
+    if (!submittedTime) return 0;
+    if (!dueTime) return null;
+
+    const dayMs = 24 * 60 * 60 * 1000;
+    const dueDay = new Date(dueTime);
+    const submittedDay = new Date(submittedTime);
+    dueDay.setHours(0, 0, 0, 0);
+    submittedDay.setHours(0, 0, 0, 0);
+
+    const daysDifference = Math.round((dueDay.getTime() - submittedDay.getTime()) / dayMs);
+    if (daysDifference >= 3) return 100;
+    if (daysDifference === 2) return 95;
+    if (daysDifference === 1) return 90;
+    if (daysDifference === 0) return 80;
+    if (daysDifference === -1) return 65;
+    if (daysDifference === -2) return 50;
+    if (daysDifference === -3) return 35;
+    return 20;
+}
+
+function finalCampaignScore(campaign) {
+    const success = campaignSuccessRate(campaign);
+    const alignment = briefAlignmentRate(campaign);
+    const delivery = onTimeDeliveryScore(campaign);
+
+    if (success === null || alignment === null || delivery === null) return null;
+    return (success * 0.5) + (alignment * 0.3) + (delivery * 0.2);
+}
+
+function scoreClass(score) {
+    if (score === null) return "not-ready";
+    if (score >= 85) return "excellent";
+    if (score >= 70) return "strong";
+    if (score >= 50) return "developing";
+    return "low";
+}
+
+function buildAgencyScores() {
+    const periodCampaigns = campaignsForSelectedPeriod();
+
     return agencies.map((agency) => {
-        const agencyId = String(agency._id || "");
-        const agencyCampaigns = campaigns.filter((campaign) => String(campaign.agencyId || "") === agencyId);
-        const creatives = agencyCampaigns.flatMap((campaign) => Array.isArray(campaign.creativeAssets) ? campaign.creativeAssets : []);
-        const submissions = creatives.length;
-        const approved = creatives.filter((asset) => normalizeCreativeStatus(asset.reviewStatus) === "Approved").length;
-        const changesRequested = creatives.filter((asset) => normalizeCreativeStatus(asset.reviewStatus) === "Changes Requested").length;
-        const pendingReview = creatives.filter((asset) => normalizeCreativeStatus(asset.reviewStatus) === "Pending Review").length;
-        const acceptedCampaigns = agencyCampaigns.filter((campaign) => normalizeCampaignStatus(campaign.status) === "Accepted").length;
-        const approvalRate = percent(approved, submissions);
-        const revisionRate = percent(changesRequested, submissions);
-        const campaignAcceptanceRate = percent(acceptedCampaigns, agencyCampaigns.length);
-        const efficiencyScore = submissions
-            ? clamp(Math.round((approvalRate * 0.72) + (campaignAcceptanceRate * 0.18) - (revisionRate * 0.2) - (pendingReview * 2)), 0, 100)
-            : 0;
+        const agencyCampaigns = periodCampaigns.filter((campaign) => String(campaign.agencyId || "") === String(agency._id || ""));
+        const campaignScores = agencyCampaigns
+            .map((campaign) => finalCampaignScore(campaign))
+            .filter((score) => Number.isFinite(score));
+        const agencyScore = campaignScores.length
+            ? campaignScores.reduce((sum, score) => sum + score, 0) / campaignScores.length
+            : null;
 
         return {
-            agencyId,
-            name: agency.name || "Unnamed Agency",
+            agencyId: agency._id,
+            agencyName: agency.name || "Unnamed Agency",
             description: agency.description || "Agency partner",
-            campaignsAssigned: agencyCampaigns.length,
-            acceptedCampaigns,
-            submissions,
-            approved,
-            changesRequested,
-            pendingReview,
-            approvalRate,
-            revisionRate,
-            efficiencyScore
+            campaignCount: agencyCampaigns.length,
+            evaluatedCount: campaignScores.length,
+            agencyScore
         };
     }).sort((a, b) => {
-        if (b.efficiencyScore !== a.efficiencyScore) return b.efficiencyScore - a.efficiencyScore;
-        if (b.approved !== a.approved) return b.approved - a.approved;
-        return b.submissions - a.submissions;
+        if (a.agencyScore === null && b.agencyScore === null) return a.agencyName.localeCompare(b.agencyName);
+        if (a.agencyScore === null) return 1;
+        if (b.agencyScore === null) return -1;
+        if (b.agencyScore !== a.agencyScore) return b.agencyScore - a.agencyScore;
+        return b.evaluatedCount - a.evaluatedCount;
     });
 }
 
-function renderKpis() {
-    const totalAgencies = agencyMetrics.length;
-    const totalSubmissions = agencyMetrics.reduce((sum, metric) => sum + metric.submissions, 0);
-    const totalApproved = agencyMetrics.reduce((sum, metric) => sum + metric.approved, 0);
-    const activeAgencies = agencyMetrics.filter((metric) => metric.submissions > 0);
-    const avgApprovalRate = activeAgencies.length
-        ? Math.round(activeAgencies.reduce((sum, metric) => sum + metric.approvalRate, 0) / activeAgencies.length)
-        : 0;
-
-    updatedAt.textContent = `Updated ${new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}`;
-
-    const cards = [
-        ["fa-building-user", totalAgencies, "Registered Agencies"],
-        ["fa-file-arrow-up", totalSubmissions, "Creative Submissions"],
-        ["fa-circle-check", totalApproved, "Approved Creatives"],
-        ["fa-percent", `${avgApprovalRate}%`, "Average Approval Rate"]
-    ];
-
-    performanceKpis.innerHTML = cards.map(([icon, value, label]) => `
-        <article class="kpi-card">
-            <i class="fa-solid ${icon}" aria-hidden="true"></i>
-            <div>
-                <strong>${escapeHtml(value)}</strong>
-                <span>${escapeHtml(label)}</span>
-            </div>
-        </article>
-    `).join("");
+function openAgency(agencyId) {
+    if (!agencyId) return;
+    window.location.href = `create_brief.html?agencyId=${encodeURIComponent(agencyId)}`;
 }
 
-function renderLeaderboard() {
-    const activeMetrics = agencyMetrics.filter((metric) => metric.submissions > 0).slice(0, 5);
-    if (!activeMetrics.length) {
-        leaderboardList.innerHTML = `<div class="empty-state">No agency submissions yet.</div>`;
+function renderScoreboard() {
+    const scores = buildAgencyScores();
+
+    if (!scores.length) {
+        agencyScoreboardBody.innerHTML = `<tr><td colspan="3"><div class="empty-state">No agencies are registered yet.</div></td></tr>`;
         return;
     }
 
-    leaderboardList.innerHTML = "";
-    activeMetrics.forEach((metric, index) => {
-        const item = document.createElement("div");
-        item.className = "leaderboard-item";
-        item.tabIndex = 0;
-        item.setAttribute("role", "button");
-        item.innerHTML = `
-            <div class="rank-badge">#${index + 1}</div>
-            <div class="leaderboard-name">
-                <strong>${escapeHtml(metric.name)}</strong>
-                <span>${escapeHtml(metric.approved)} approved from ${escapeHtml(metric.submissions)} submissions</span>
-            </div>
-            <div class="leaderboard-score">${escapeHtml(metric.efficiencyScore)}%</div>
+    agencyScoreboardBody.innerHTML = "";
+    scores.forEach((score, index) => {
+        const hasScore = score.agencyScore !== null;
+        const row = document.createElement("tr");
+        row.className = "scoreboard-row";
+        row.tabIndex = 0;
+        row.setAttribute("role", "button");
+        row.innerHTML = `
+            <td><span class="rank-pill ${index < 3 && hasScore ? "top-rank" : ""}">#${index + 1}</span></td>
+            <td>
+                <div class="agency-name-cell">
+                    <strong>${escapeHtml(score.agencyName)}</strong>
+                    <span>${escapeHtml(score.description)}</span>
+                </div>
+            </td>
+            <td>
+                <span class="agency-score-pill ${escapeHtml(scoreClass(score.agencyScore))}">
+                    ${hasScore ? `${score.agencyScore.toFixed(1)}%` : "Not ready"}
+                </span>
+            </td>
         `;
-        item.addEventListener("click", () => openAgency(metric));
-        item.addEventListener("keydown", (event) => {
+        row.addEventListener("click", () => openAgency(score.agencyId));
+        row.addEventListener("keydown", (event) => {
             if (event.key === "Enter" || event.key === " ") {
                 event.preventDefault();
-                openAgency(metric);
+                openAgency(score.agencyId);
             }
         });
-        leaderboardList.appendChild(item);
+        agencyScoreboardBody.appendChild(row);
     });
 }
 
-function renderInsights() {
-    const activeMetrics = agencyMetrics.filter((metric) => metric.submissions > 0);
-    const topAgency = activeMetrics[0];
-    const mostChanges = activeMetrics.slice().sort((a, b) => b.changesRequested - a.changesRequested)[0];
-    const mostPending = activeMetrics.slice().sort((a, b) => b.pendingReview - a.pendingReview)[0];
-    const inactiveCount = agencyMetrics.filter((metric) => metric.submissions === 0).length;
-
-    const insights = [];
-    if (topAgency) {
-        insights.push(["fa-trophy", "Top performer", `${topAgency.name} leads with a ${topAgency.efficiencyScore}% efficiency score.`]);
-    }
-    if (mostChanges && mostChanges.changesRequested > 0) {
-        insights.push(["fa-rotate-left", "Most revisions", `${mostChanges.name} has ${mostChanges.changesRequested} change request(s).`]);
-    }
-    if (mostPending && mostPending.pendingReview > 0) {
-        insights.push(["fa-hourglass-half", "Pending reviews", `${mostPending.name} has ${mostPending.pendingReview} creative(s) waiting for review.`]);
-    }
-    if (inactiveCount > 0) {
-        insights.push(["fa-circle-info", "No submissions yet", `${inactiveCount} agenc${inactiveCount === 1 ? "y has" : "ies have"} no creative submissions yet.`]);
-    }
-
-    if (!insights.length) {
-        insightList.innerHTML = `<div class="empty-state">No performance insights available yet.</div>`;
-        return;
-    }
-
-    insightList.innerHTML = insights.map(([icon, title, copy]) => `
-        <div class="insight-item">
-            <i class="fa-solid ${icon}" aria-hidden="true"></i>
-            <div>
-                <strong>${escapeHtml(title)}</strong>
-                <span>${escapeHtml(copy)}</span>
-            </div>
-        </div>
-    `).join("");
-}
-
-function renderAgencyCards() {
-    if (!agencyMetrics.length) {
-        agencyCardGrid.innerHTML = `<div class="empty-state">No agencies are registered yet.</div>`;
-        return;
-    }
-
-    agencyCardGrid.innerHTML = "";
-    agencyMetrics.forEach((metric) => {
-        const label = performanceLabel(metric);
-        const card = document.createElement("article");
-        card.className = "agency-score-card";
-        card.tabIndex = 0;
-        card.setAttribute("role", "button");
-        card.innerHTML = `
-            <div class="agency-card-head">
-                <div>
-                    <h3>${escapeHtml(metric.name)}</h3>
-                    <p>${escapeHtml(metric.campaignsAssigned)} assigned campaign(s)</p>
-                </div>
-                <span class="performance-label ${escapeHtml(labelClass(label))}">${escapeHtml(label)}</span>
-            </div>
-            <div class="score-meter">
-                <div class="score-meter-row">
-                    <span>Efficiency score</span>
-                    <strong>${escapeHtml(metric.efficiencyScore)}%</strong>
-                </div>
-                <div class="score-track" aria-hidden="true">
-                    <div class="score-fill" style="width:${metric.efficiencyScore}%"></div>
-                </div>
-            </div>
-            <div class="agency-card-stats">
-                <div>
-                    <strong>${escapeHtml(metric.submissions)}</strong>
-                    <span>Submissions</span>
-                </div>
-                <div>
-                    <strong>${escapeHtml(metric.approved)}</strong>
-                    <span>Approved</span>
-                </div>
-                <div>
-                    <strong>${escapeHtml(metric.changesRequested)}</strong>
-                    <span>Changes</span>
-                </div>
-            </div>
-        `;
-        card.addEventListener("click", () => openAgency(metric));
-        card.addEventListener("keydown", (event) => {
-            if (event.key === "Enter" || event.key === " ") {
-                event.preventDefault();
-                openAgency(metric);
-            }
-        });
-        agencyCardGrid.appendChild(card);
+if (periodFilter) {
+    periodFilter.addEventListener("change", () => {
+        selectedPeriodMonths = Number(periodFilter.value || 1);
+        renderScoreboard();
     });
 }
 
-function renderPage() {
-    renderKpis();
-    renderLeaderboard();
-    renderInsights();
-    renderAgencyCards();
-}
-
-async function loadPerformance() {
+async function loadAgencyScoreboard() {
     try {
         const [agencyRes, campaignRes] = await Promise.all([
             fetch("/api/agencies"),
@@ -276,16 +218,11 @@ async function loadPerformance() {
         if (!agencyRes.ok) throw new Error(agencyData.message || "Failed to load agencies");
         if (!campaignRes.ok) throw new Error(campaignData.message || "Failed to load campaigns");
 
-        agencyMetrics = buildAgencyMetrics(
-            Array.isArray(agencyData) ? agencyData : [],
-            Array.isArray(campaignData) ? campaignData : []
-        );
-        renderPage();
+        agencies = Array.isArray(agencyData) ? agencyData : [];
+        campaigns = Array.isArray(campaignData) ? campaignData : [];
+        renderScoreboard();
     } catch (err) {
-        performanceKpis.innerHTML = "";
-        leaderboardList.innerHTML = `<div class="empty-state">Performance data unavailable.</div>`;
-        insightList.innerHTML = `<div class="empty-state">${escapeHtml(err.message || "Could not load agency performance.")}</div>`;
-        agencyCardGrid.innerHTML = "";
+        agencyScoreboardBody.innerHTML = `<tr><td colspan="3"><div class="empty-state">${escapeHtml(err.message || "Could not load agency scoreboard.")}</div></td></tr>`;
     }
 }
 
@@ -301,5 +238,5 @@ window.logout = () => {
 if (!userId) {
     window.location.href = "LOGIN.html";
 } else {
-    loadPerformance();
+    loadAgencyScoreboard();
 }
